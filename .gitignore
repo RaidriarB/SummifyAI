@@ -24,3 +24,7 @@ tempdata/
 # System files
 .DS_Store
 Thumbs.db
+
+
+# test file
+test/
