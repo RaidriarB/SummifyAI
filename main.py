@@ -96,8 +96,8 @@ def main():
     args = parser.parse_args()
     
     # 确保输入文件存在
-    if not os.path.exists(args.input_file):
-        logger.error(f'输入文件不存在: {args.input_file}')
+    if not os.path.exists(args.input):
+        logger.error(f'输入文件不存在: {args.input}')
         return
     
     # 确保输出目录存在
@@ -108,8 +108,8 @@ def main():
     steps = parse_steps(args.steps)
     logger.info(f'将执行以下步骤: {steps}')
     
-    current_file = args.input_file
-    base_name = os.path.splitext(os.path.basename(args.input_file))[0]
+    current_file = args.input
+    base_name = os.path.splitext(os.path.basename(args.input))[0]
     
     try:
 
@@ -127,6 +127,13 @@ def main():
                 logger.error('移动预处理结果失败')
                 return
             current_file = data_file
+            
+            # 如果步骤1是最后一步，将结果复制到output目录
+            if steps[-1] == 1:
+                output_file = os.path.join(args.output_dir, os.path.basename(current_file))
+                if not copy_file(current_file, output_file):
+                    logger.error('复制预处理结果到output目录失败')
+                    return
         
         # 步骤2：语音转写
         if 2 in steps:
@@ -144,6 +151,13 @@ def main():
                 logger.error('移动转写结果失败')
                 return
             current_file = data_file
+            
+            # 如果步骤2是最后一步，将结果复制到output目录
+            if steps[-1] == 2:
+                output_file = os.path.join(args.output_dir, os.path.basename(current_file))
+                if not copy_file(current_file, output_file):
+                    logger.error('复制转写结果到output目录失败')
+                    return
         
         # 步骤3：AI文本修正润色
         if 3 in steps:
@@ -179,6 +193,13 @@ def main():
                     if not copy_file(current_file, data_file):
                         logger.error('保存文本修正润色结果失败')
                         return
+                    
+                    # 如果步骤3是最后一步，将结果复制到output目录
+                    if steps[-1] == 3:
+                        output_file = os.path.join(args.output_dir, os.path.basename(current_file))
+                        if not copy_file(current_file, output_file):
+                            logger.error('复制文本修正润色结果到output目录失败')
+                            return
                 else:
                     logger.error('保存文本修正润色文本失败')
                     return

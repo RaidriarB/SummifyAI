@@ -19,35 +19,29 @@ SummifyAI 能将音频或视频快速转写为文字，并通过自定义 prompt
 
 ### 1.0 环境要求
 
-- Python 3.9 或更高版本
-- FFmpeg
+- Python 3.8+ (claude依赖的anthropic需要3.8+)
 - Buzz
 - 目前只在MacOS中测试过
 ### 1.1 依赖安装
 
-1. **FFmpeg 安装**
-   - 官方网站：[https://ffmpeg.org/download.html](https://ffmpeg.org/download.html)
-   - macOS安装方法（使用 Homebrew）：
-     ```bash
-     brew install ffmpeg
-     ```
-
-2. **Buzz工具安装，并使命令行能调用**
+1. **Buzz工具安装，并使命令行能调用**
    - 官方网站：[https://github.com/chidiwilliams/buzz](https://github.com/chidiwilliams/buzz)
-   - 下载应用后，需要下载所需模型。本项目中使用whisper-large-v3-turbo模型
-   - 将buzz的可执行文件所在文件夹，添加到环境变量中。
+   - 下载应用后，需要下载所需模型。工具默认使用`whisper`模型的`large-v3-turbo`版本
+   - 将buzz的可执行文件所在文件夹，添加到环境变量中,保证命令行执行`buzz -v`能正常显示信息。
     - MacOS中，可执行文件一般位于`/Applications/Buzz.app/Contents/MacOS/Buzz`
-    - 因此，把这一行加到zshrc或bashrc中：`export PATH="/Applications/Buzz.app/Contents/MacOS:$PATH"`
+      - 把这一行加到zshrc或bashrc中：`export PATH="/Applications/Buzz.app/Contents/MacOS:$PATH"`
+    - Windows中，可执行文件一般位于你安装buzz时的地方，例如`C:\Program Files (x86)\Buzz`
+      - 把这个路径加到系统环境变量中
 
-3. **Python 依赖安装**
+2. **Python 依赖安装**
 
 ```bash
-cd SummifyAI
 pip install -r requirements.txt
 ```
 ### 1.2 配置
 - 在config.py中，配置apikey，并指定使用的模型。
 - prompts文件夹中，可编写多个txt文件，作为自定义的prompt，工具会分别处理。
+- 其他高级配置可以不用动
 
 ## 2 使用方法
 
@@ -92,6 +86,37 @@ optional arguments:
                         
                         输出目录，用于存放处理结果（默认：output）
                         每个步骤的结果将保存在该目录下
+```
+## 3 常见问题
+
+
+### buzz调用失败
+```bash
+ERROR:src.transcription:执行音频转写时发生未知错误: [Errno 2] No such file or directory: 'buzz'
+```
+说明buzz命令没有被正确设置，请检查，直接在命令行中执行`buzz -v`，能不能正常运行。
+
+### 第三步、第四步调用AI失败
+报错：
+```bash
+INFO:__main__:步骤3：开始AI文本修正润色
+INFO:openai._base_client:Retrying request to /chat/completions in 0.467374 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.459727 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.995082 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.829292 seconds
+ERROR:src.ai_service:调用API时出错: Connection error.
+ERROR:src.ai_service:调用API时出错: Connection error.
+ERROR:__main__:AI文本修正润色失败
+```
+调用openai的库可能需要科学上网。需要在命令行中指定代理:
+```
+# Windows
+set HTTP_PROXY=http://127.0.0.1:7897
+set HTTPS_PROXY=http://127.0.0.1:7897
+
+# *nix
+export HTTP_PROXY=http://127.0.0.1:7897
+export HTTPS_PROXY=http://127.0.0.1:7897
 ```
 
 ## 其他

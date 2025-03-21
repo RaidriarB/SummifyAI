@@ -2,6 +2,7 @@ import subprocess
 import os
 import logging
 import time
+import sys
 
 import config
 
@@ -47,7 +48,20 @@ def transcribe_audio(audio_path, prompt, n_threads=4):
             '--hide-gui',
             audio_path
         ]
-        
+
+        # # 根据平台添加对应路径
+        # additional_paths = []
+        # if sys.platform.startswith('win'):
+        #     # Windows 平台
+        #     additional_paths.append(r"C:\Program Files (x86)\Buzz")
+        # elif sys.platform == 'darwin':
+        #     # macOS 平台
+        #     additional_paths.append(r"/Applications/Buzz.app/Contents/MacOS/Buzz")
+        # # TODO 如果需要支持 Linux，可以在这里添加对应的路径
+
+        # # 更新当前进程的 PATH 环境变量，将新的路径放在前面
+        # os.environ["PATH"] = os.pathsep.join(additional_paths + [os.environ.get("PATH", "")])
+
         # 执行命令
         subprocess.run(cmd, env=env, check=True)
         

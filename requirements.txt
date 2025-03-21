@@ -1,2 +1,4 @@
 openai
 anthropic
+ffmpeg-python
+imageio_ffmpeg

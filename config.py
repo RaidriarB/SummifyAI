@@ -1,6 +1,6 @@
 # API配置
 # Claude API密钥
-API_KEY = "你的api"
+API_KEY = "sk-23fc2392936c44fc8883b7c8ed7b2085"
 
 # API类型，可选值：'deepseek'或'claude'
 API_TYPE = 'deepseek'
