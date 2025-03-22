@@ -12,6 +12,7 @@ build/
 venv/
 env/
 .env/
+.python-version
 
 # IDE
 .vscode/
@@ -28,3 +29,9 @@ Thumbs.db
 
 # test file
 test/
+
+# test py file
+test*.py
+
+# deprecated files
+*.deprecated

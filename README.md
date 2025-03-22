@@ -5,7 +5,7 @@
 SummifyAI 能将音频或视频快速转写为文字，并通过自定义 prompt 进行总结精炼、笔记整理、摘要生成等一系列操作，大幅提升你的学习与工作效率。
 - 支持Windows、MacOS
 - 支持多种音频和视频格式输入
-- 使用 Buzz 进行本地的高质量语音转写，无需付费
+- 基于whisper库在本地进行语音转写
 - 调用 AI 智能添文本修正润色和修正文本，大幅提高准确性（可选用超便宜的deepseek！）
 - 可自定义prompt，进行生成文本摘要和关键信息提取等一系列操作
 - 分步骤处理，可灵活选择执行的功能
@@ -18,31 +18,18 @@ SummifyAI 能将音频或视频快速转写为文字，并通过自定义 prompt
 
 ## 1 安装说明
 
-### 1.0 环境要求
-
-- Python 3.8+
-- Buzz
-
-### 1.1 依赖安装
-
-1. **Buzz工具安装，并使命令行能调用**
-   - 官方网站：[https://github.com/chidiwilliams/buzz](https://github.com/chidiwilliams/buzz)
-   - 下载应用后，需要下载所需模型。工具默认使用`whisper`模型的`large-v3-turbo`版本
-   - 将buzz的可执行文件所在文件夹，添加到环境变量中,保证命令行执行`buzz -v`能正常显示信息。
-    - MacOS中，可执行文件一般位于`/Applications/Buzz.app/Contents/MacOS/Buzz`
-      - 把这一行加到zshrc或bashrc中：`export PATH="/Applications/Buzz.app/Contents/MacOS:$PATH"`
-    - Windows中，可执行文件一般位于你安装buzz时的地方，例如`C:\Program Files (x86)\Buzz`
-      - 把这个路径加到系统环境变量中
-
-2. **Python 依赖安装**
+- 需要Python 3.10+ 
 
 ```bash
+# 建议使用虚拟环境（venv或者pyenv），具体方法自行搜索
 pip install -r requirements.txt
 ```
-### 1.2 配置
-- 在config.py中，配置apikey，并指定使用的模型。
+
+安装后配置：
+- 在config.py中，配置apikey
 - prompts文件夹中，可编写多个txt文件，作为自定义的prompt，工具会分别处理。
-- 其他高级配置可以不用动
+- 其他高级配置可以暂时不用动
+- **注意：首次使用需要下载whisper库的模型文件，模型文件大小从几十MB、几百MB到1.5GB左右不等**
 
 ## 2 使用方法
 
@@ -91,12 +78,6 @@ optional arguments:
 ## 3 常见问题
 
 
-### buzz调用失败
-```bash
-ERROR:src.transcription:执行音频转写时发生未知错误: [Errno 2] No such file or directory: 'buzz'
-```
-说明buzz命令没有被正确设置，请检查，直接在命令行中执行`buzz -v`，能不能正常运行。
-
 ### 第三步、第四步调用AI失败
 报错：
 ```bash
@@ -123,13 +104,9 @@ export HTTPS_PROXY=http://127.0.0.1:7897
 ## 其他
 
 更新日志：
+- 2025-03-22 直接使用whisper库，无需再下载buzz
 - 2025-03-21 代码模块化、参数变量化、添加openai支持
 - 2025-03-20 初始版本
 
-
 ---
 欢迎提需求！
-
-buzz-whisper-large-v3-turbo 转写速度：MacbookPro M4 8线程，25min -> 205秒转写完成
-
-调用deepseek api处理速度：慢的时候要一两分钟

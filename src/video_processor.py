@@ -25,7 +25,7 @@ def preprocess_video(video_path):
 
         # 构建输出文件路径，使用 m4a 容器
         base, _ = os.path.splitext(video_path)
-        output_path = f"{base}_audio.m4a"
+        output_path = f"{base}_音频.m4a"
 
         # 构造 ffmpeg 处理链
         # 使用 stream.audio 来仅保留音频流，并禁用视频（vn）

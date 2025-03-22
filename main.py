@@ -3,7 +3,6 @@ import argparse
 import os
 import logging
 
-# 导入各个模块的功能
 from src.video_processor import preprocess_video
 from src.transcription import transcribe_audio
 from src.text_processor import add_punctuation, process_with_prompts
@@ -16,7 +15,7 @@ import config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-VERSION = 'v1.1.0'
+VERSION = 'v1.2.0'
 AUTHOR = 'RaidriarB'
 
 
@@ -138,8 +137,8 @@ def main():
         # 步骤2：语音转写
         if 2 in steps:
             logger.info('步骤2：开始语音转写')
-            prompt = '将以下音频转写成中文文本。这段音频是关于人工智能的技术讨论。演讲者可能会使用"深度学习"、"自然语言处理"和"强化学习"等术语。请提供清晰准确的转写文本，并确保使用正确的标点符号。'
-            transcribed_file = transcribe_audio(current_file, prompt,n_threads=config.TRANS_THREADS)
+            prompt = '将以下音频转写成中文文本,确保使用正确的标点符号。'
+            transcribed_file = transcribe_audio(current_file, prompt)
             if not transcribed_file:
                 logger.error('语音转写失败')
                 return
