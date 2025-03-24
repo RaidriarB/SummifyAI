@@ -77,7 +77,7 @@ def add_punctuation(text, api_key, prompt, chunk_size=2000, api_type='deepseek')
     return "".join(ordered_results)
 
 
-def process_with_prompts(text, api_key, api_type='deepseek'):
+def process_with_prompts(text, api_key, api_type='deepseek',prompts_dir='prompts',output_dir='output'):
     """
     读取prompts文件夹中的提示词文件并调用AI处理
     
@@ -96,8 +96,8 @@ def process_with_prompts(text, api_key, api_type='deepseek'):
         logger.info(f'开始处理提示词文件，使用{max_workers}个线程')
         
         # 确保prompts和output目录存在
-        prompts_dir = 'prompts'
-        output_dir = 'output'
+        #prompts_dir = 'prompts'
+        #output_dir = 'output'
         for dir_path in [prompts_dir, output_dir]:
             if not os.path.exists(dir_path):
                 os.makedirs(dir_path)

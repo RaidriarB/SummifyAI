@@ -6,13 +6,22 @@
     <title>SummifyAI - 文件管理</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
+        :root {
+            --primary-color: #0d6efd;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+            --info-color: #0dcaf0;
+            --border-color: #dee2e6;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
         .progress-container {
             height: 300px;
             overflow-y: auto;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             padding: 15px;
             margin-top: 20px;
             background-color: #1e1e1e;
@@ -21,6 +30,7 @@
             font-size: 14px;
             line-height: 1.5;
             white-space: pre-wrap;
+            box-shadow: 0 2px 4px var(--shadow-color);
         }
         .progress-container::before {
             content: '> ';
@@ -46,6 +56,79 @@
             margin-top: 20px;
             max-height: 400px;
             overflow-y: auto;
+            overflow-x: hidden;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            background-color: #fff;
+        }
+        .table {
+            margin-bottom: 0;
+        }
+        .table thead th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid var(--border-color);
+            padding: 12px;
+            font-weight: 600;
+        }
+        .table td {
+            padding: 12px;
+            vertical-align: middle;
+        }
+        .table tr:hover {
+            background-color: #f8f9fa;
+        }
+        @media (max-width: 768px) {
+            .table-responsive {
+                padding: 5px;
+            }
+            .table td {
+                white-space: normal;
+                word-break: break-all;
+                min-width: auto;
+                max-width: none;
+            }
+            
+            .section-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .modal-dialog {
+                margin: 20px;
+            }
+            .modal-content {
+                border-radius: 12px;
+                border: none;
+                box-shadow: 0 4px 6px var(--shadow-color);
+            }
+            .modal-header {
+                padding: 20px;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .modal-body {
+                padding: 20px;
+            }
+            .modal-footer {
+                padding: 20px;
+                border-top: 1px solid var(--border-color);
+            }
+        }
+        .table-responsive::-webkit-scrollbar {
+            width: 8px;
+        }
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
         .navbar-brand {
             font-weight: bold;
@@ -60,15 +143,27 @@
             align-items: center;
             margin-bottom: 20px;
         }
+        .list-group-item {
+            border: 1px solid var(--border-color);
+            margin-bottom: 8px;
+            border-radius: 8px !important;
+            transition: all 0.2s ease-in-out;
+        }
+        .list-group-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px var(--shadow-color);
+        }
         .list-group-item.active {
             background-color: #e9ecef;
-            border-color: #dee2e6;
+            border-color: var(--border-color);
             color: #212529;
         }
         .list-group-item.active .btn-primary {
             background-color: #0d6efd;
             border-color: #0d6efd;
         }
+
+        
     </style>
 </head>
 <body>
@@ -79,36 +174,42 @@
     </nav>
 
     <div class="container mt-4">
-        <!-- 文件列表 -->
+        <!-- 已下载文件列表 -->
         <div class="section-header">
-            <h2 class="section-title mb-0">文件列表</h2>
+            <h2 class="section-title mb-0">已下载文件列表</h2>
             <div class="btn-group">
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#promptModal">
-                    <i class="bi bi-file-text"></i> Prompt管理
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#promptModal">
+                    <i class="bi bi-file-earmark-text"></i> Prompt管理
                 </button>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#downloadModal">
-                    <i class="bi bi-download"></i> 下载音视频
+                    <i class="bi bi-cloud-download"></i> 下载音视频
                 </button>
             </div>
         </div>
 
         <!-- 下载视频模态框 -->
         <div class="modal fade" id="downloadModal" tabindex="-1" aria-labelledby="downloadModalLabel" aria-hidden="true">
-            <div class="modal-dialog">
+            <div class="modal-dialog modal-lg">
                 <div class="modal-content">
-                    <div class="modal-header">
+                    <div class="modal-header bg-primary text-white">
                         <h5 class="modal-title" id="downloadModalLabel">下载音视频</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
+                    <div class="modal-body p-4">
+                        <div class="alert alert-info mb-4">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            支持的平台：哔哩哔哩（bilibili）、小宇宙播客
+                        </div>
                         <form id="downloadForm">
-                            <div class="mb-3">
-                                <label for="videoUrl" class="form-label">音视频URL</label>
-                                <input type="text" class="form-control" id="videoUrl" name="url" placeholder="输入视频URL" required>
+                            <div class="mb-4">
+                                <label for="videoUrl" class="form-label fw-bold">音视频URL</label>
+                                <input type="text" class="form-control form-control-lg" id="videoUrl" name="url" placeholder="请输入视频或播客链接" required>
                             </div>
                             <div class="text-end">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                                <button type="submit" class="btn btn-primary">下载</button>
+                                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-download me-2"></i>开始下载
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -131,12 +232,16 @@
                         <td>{{ file.last_time }}</td>
                         <td>
                             <div class="btn-group" role="group">
-                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '12')">仅转写</button>
-                                <button class="btn btn-outline-info btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '123')">转写+修补</button>
-                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '1234')">转写+修补+AI总结</button>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '12')">只做转写</button>
+                                <button class="btn btn-outline-info btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '123')">转后修补</button>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '1234')">转补总结</button>
                                 <div class="btn-group ms-3" role="group">
-                                    <button class="btn btn-info btn-sm me-2" onclick="viewTranscription('{{ file.name }}')">查看转写</button>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteFile('{{ file.name }}')">删除</button>
+                                    <button class="btn btn-info btn-sm me-2" onclick="viewTranscription('{{ file.name }}')">
+                                        <i class="bi bi-eye"></i> 查看转写
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="deleteFile('{{ file.name }}')" title="删除文件">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                         </td>
@@ -185,10 +290,20 @@
             });
         }
 
+        // 监听下载进度
+        socket.on('download_progress', function(data) {
+            progressDiv.innerHTML += data.message + '<br>';
+            progressDiv.scrollTop = progressDiv.scrollHeight;
+            if (data.status === 'success') {
+                setTimeout(() => location.reload(), 1000);
+            }
+        });
+
         // 下载视频
         document.getElementById('downloadForm').onsubmit = function(e) {
             e.preventDefault();
             const url = this.url.value;
+            progressDiv.innerHTML = '开始下载：' + url + '<br>';
             fetch('/download', {
                 method: 'POST',
                 headers: {
@@ -198,10 +313,11 @@
             })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'success') {
-                    location.reload();
+                if (data.status === 'error') {
+                    progressDiv.innerHTML += '错误：' + data.message + '<br>';
                 }
             });
+            document.querySelector('#downloadModal .btn-close').click();
         };
 
 
@@ -218,7 +334,7 @@
             if (!confirm('确定要删除文件 ' + filename + ' 吗？')) {
                 return;
             }
-            fetch('/delete/' + encodeURIComponent(filename), {
+            fetch('/delete_all_file/' + encodeURIComponent(filename), {
                 method: 'POST'
             })
             .then(response => response.json())

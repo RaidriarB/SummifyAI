@@ -1,6 +1,6 @@
 # API配置
 # API密钥
-API_KEY = "sk-xxxx"
+API_KEY = "sk-xxxxxx"
 
 # API类型，可选值：'deepseek'或'claude'
 API_TYPE = 'deepseek'

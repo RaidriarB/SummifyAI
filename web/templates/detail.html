@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SummifyAI - 转写详情</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
   marked.setOptions({
@@ -17,19 +18,69 @@
   });
 </script>
     <style>
+        :root {
+            --primary-color: #0d6efd;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+            --info-color: #0dcaf0;
+            --border-color: #dee2e6;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
         .navbar-brand {
             font-weight: bold;
         }
         .section-title {
             margin: 30px 0 20px;
             color: #333;
+            font-weight: 600;
         }
         .file-list {
             margin-top: 20px;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             background-color: #f8f9fa;
             padding: 15px;
+            overflow-x: hidden;
+            box-shadow: 0 2px 4px var(--shadow-color);
+        }
+        @media (max-width: 768px) {
+            .file-list {
+                padding: 10px;
+            }
+            .list-group-item {
+                padding: 10px;
+                flex-wrap: wrap;
+            }
+            .list-group-item .btn-group {
+                display: flex;
+                flex-direction: row;
+                gap: 5px;
+                margin-top: 10px;
+                width: 100%;
+                justify-content: flex-start;
+            }
+            .list-group-item .btn-group .btn {
+                flex: 1;
+                margin: 0 !important;
+                min-width: auto;
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-weight: 500;
+                transition: all 0.2s ease-in-out;
+            }
+            .list-group-item .btn-group .btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 2px 4px var(--shadow-color);
+            }
+            .file-name {
+                word-break: break-all;
+                width: 100%;
+                margin-right: 0;
+            }
+            .section-title {
+                font-size: 1.5rem;
+                margin: 20px 0;
+            }
         }
         .file-list .list-group {
             max-height: 40vh;
@@ -38,10 +89,12 @@
         .preview-area {
             height: 50vh;
             overflow-y: auto;
-            padding: 1rem;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             margin-top: 20px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            background-color: #fff;
         }
     </style>
 </head>
@@ -63,11 +116,11 @@
             <div class="list-group">
                 {% for file in files %}
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    <span class="file-name" data-file="{{ file.name }}" data-folder="{{ filename }}">{{ file.name }}</span>
+                    <span class="file-name" data-file="{{ file.name }}">{{ file.name }}</span>
                     <div class="btn-group">
-                        <button class="btn btn-sm btn-primary view-btn" data-file="{{ file.name }}" data-folder="{{ filename }}" style="white-space: nowrap; min-width: 60px;">查看</button>
-                        <a href="/download_file/{{ filename }}/{{ file.name }}" class="btn btn-sm btn-success" style="white-space: nowrap; min-width: 60px;">下载</a>
-                        <button class="btn btn-sm btn-danger delete-btn" data-file="{{ file.name }}" data-folder="{{ filename }}" style="white-space: nowrap; min-width: 60px;">删除</button>
+                        <button class="btn btn-sm btn-primary view-btn" data-file="{{ file.name }}" style="white-space: nowrap; min-width: 60px;">查看</button>
+                        <a href="/download_file/{{ filename.split('.')[0] }}/{{ file.name }}" class="btn btn-sm btn-success" style="white-space: nowrap; min-width: 60px;">下载</a>
+                        <button class="btn btn-sm btn-danger delete-btn" data-file="{{ file.name }}" style="white-space: nowrap; min-width: 60px;">删除</button>
                     </div>
                 </div>
                 {% endfor %}
@@ -85,7 +138,7 @@
             document.querySelectorAll('.view-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const fileName = this.dataset.file;
-                    const folderName = this.dataset.folder;
+                    const folderName = '{{ filename }}'.split('.')[0];
                     fetch(`/view_file/${folderName}/${fileName}`)
                         .then(response => response.text())
                         .then(content => {
@@ -106,13 +159,24 @@
                 btn.addEventListener('click', function() {
                     if (confirm('确定要删除这个文件吗？')) {
                         const fileName = this.dataset.file;
-                        const folderName = this.dataset.folder;
-                        fetch(`/delete_file/${folderName}/${fileName}`, { method: 'POST' })
+                        const folderName = '{{ filename }}'.split('.')[0];
+                        const url = `/delete_file_in_output/${folderName}/${fileName}`;
+                        console.log('[DEBUG] 删除文件请求URL:', url);
+                        fetch(url, { method: 'POST' })
                             .then(response => response.json())
                             .then(data => {
+                                console.log('[DEBUG] 删除文件响应:', data);
                                 if (data.status === 'success') {
+                                    console.log('[DEBUG] 删除成功，移除DOM元素');
                                     this.closest('.list-group-item').remove();
+                                } else {
+                                    console.log('[DEBUG] 删除失败:', data.message);
+                                    alert('删除失败: ' + data.message);
                                 }
+                            })
+                            .catch(error => {
+                                console.error('[DEBUG] 删除请求出错:', error);
+                                alert('删除请求出错');
                             });
                     }
                 });

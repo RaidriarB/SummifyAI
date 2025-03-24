@@ -1,33 +1,40 @@
 import os
+import re
 import yt_dlp
+from spiders.bilibili import download_from_url as download_bilibili_from_url
+from spiders.xiaoyuzhou import download_from_url as download_xiaoyuzhou_from_url
 
-def download_video(url, output_dir):
-    """
-    下载视频到指定目录
-    
-    Args:
-        url (str): 视频URL
-        output_dir (str): 输出目录
-    
-    Returns:
-        str: 下载后的文件名，如果下载失败则返回None
-    """
-    try:
-        # 配置yt-dlp选项
-        ydl_opts = {
-            'format': 'best',  # 下载最佳质量
-            'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
-            'quiet': True,
-            'no_warnings': True,
-        }
-        
-        # 下载视频
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            video_title = info['title']
-            video_ext = info['ext']
-            return f"{video_title}.{video_ext}"
-            
-    except Exception as e:
-        print(f"下载视频时出错: {e}")
+
+def is_valid_url(url):
+    # 简单URL格式验证
+    pattern = re.compile(r'https?://(?:www\.)?\S+\.[a-zA-Z]{2,}')
+    return bool(pattern.match(url))
+
+
+def get_platform(url):
+    # 根据域名判断平台
+    if 'bilibili.com' in url or 'b23.tv' in url:
+        return 'bilibili'
+    elif 'xiaoyuzhoufm.com' in url:
+        return 'xiaoyuzhou'
+    else:
         return None
+
+def download_media(url, output_dir):
+    # 检查URL合法性
+    if not is_valid_url(url):
+        print('无效的URL')
+        return None
+
+    # 判断平台
+    platform = get_platform(url)
+
+    # 调用相应平台的下载函数
+    if platform == 'bilibili':
+        return download_bilibili_from_url(url,output_dir)
+    elif platform == 'xiaoyuzhou':
+        return download_xiaoyuzhou_from_url(url, output_dir)
+    else:
+        print('不支持的平台')
+        return None
+

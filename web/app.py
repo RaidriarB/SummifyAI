@@ -8,7 +8,7 @@ import subprocess
 from threading import Thread
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
+app.config['SECRET_KEY'] = 'secret!?s3cReT1-df1ocn1oi3ofinsd'
 socketio = SocketIO(app)
 
 # 配置文件存储路径
@@ -31,12 +31,21 @@ def index():
     # 为每个文件准备转写信息
     files_info = []
     for file in files:
-        record = file_records.get(file, {'transcribed': False, 'last_transcription_time': None})
+        record = file_records.get(file, {'transcribed': False, 'last_transcription_time': None, 'created_time': None})
+        if not record.get('created_time'):
+            # 如果没有创建时间记录，则更新记录
+            update_transcription_record(file, created_time=time.strftime('%Y-%m-%d %H:%M:%S'))
+            record['created_time'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        
         files_info.append({
             'name': file,
             'transcribed': record['transcribed'],
-            'last_time': record['last_transcription_time'] or '未转写'
+            'last_time': record['last_transcription_time'] or '未转写',
+            'created_time': record['created_time']
         })
+    
+    # 按创建时间倒序排序
+    files_info.sort(key=lambda x: x['created_time'] or '', reverse=True)
     
     return render_template('index.html', files=files_info)
 
@@ -46,14 +55,22 @@ def download_video():
     if not url:
         return jsonify({'status': 'error', 'message': 'URL不能为空'})
     
-    from crawler import download_video as dl
+    from crawler import download_media
     upload_dir = os.path.join(app.root_path, UPLOAD_FOLDER)
-    filename = dl(url, upload_dir)
-    
-    if filename:
-        return jsonify({'status': 'success', 'message': f'视频 {filename} 下载成功'})
-    else:
-        return jsonify({'status': 'error', 'message': '下载失败'})
+    try:
+        filename = download_media(url, upload_dir)
+        if filename:
+            # 记录文件创建时间
+            update_transcription_record(filename, created_time=time.strftime('%Y-%m-%d %H:%M:%S'))
+            socketio.emit('download_progress', {'status': 'success', 'message': f'文件 {filename} 下载成功'})
+            return jsonify({'status': 'success', 'message': f'文件 {filename} 下载成功'})
+        else:
+            socketio.emit('download_progress', {'status': 'error', 'message': '下载失败'})
+            return jsonify({'status': 'error', 'message': '下载失败'})
+    except Exception as e:
+        error_message = str(e)
+        socketio.emit('download_progress', {'status': 'error', 'message': error_message})
+        return jsonify({'status': 'error', 'message': error_message})
 
 @app.route('/transcribe', methods=['POST'])
 def start_transcribe():
@@ -117,18 +134,54 @@ def download_file(filename):
         return send_file(file_path, as_attachment=True)
     return '文件不存在'
 
-@app.route('/delete_file/<path:filename>', methods=['POST'])
-def delete_file(filename):
-    # 分离文件夹名和文件名
-    parts = filename.split('/')
-    folder_name = parts[0]
-    file_name = parts[1] if len(parts) > 1 else parts[0]
-    file_path = os.path.join(app.root_path, OUTPUT_FOLDER, folder_name, file_name)
+@app.route('/delete_all_file/<path:filename>', methods=['POST'])
+def delete_all_file(filename):
+    import shutil
+    
+    # 删除源文件
+    source_file = os.path.join(app.root_path, UPLOAD_FOLDER, filename)
+    if os.path.exists(source_file):
+        try:
+            os.remove(source_file)
+            print(f"[DEBUG] 源文件删除成功: {source_file}")
+        except Exception as e:
+            print(f"[DEBUG] 删除源文件时出错: {str(e)}")
+            return jsonify({'status': 'error', 'message': f'删除源文件时出错: {str(e)}'})
+    
+    # 删除输出文件夹
+    output_folder = os.path.join(app.root_path, OUTPUT_FOLDER, os.path.splitext(filename)[0])
+    if os.path.exists(output_folder):
+        try:
+            shutil.rmtree(output_folder)
+            print(f"[DEBUG] 输出文件夹删除成功: {output_folder}")
+        except Exception as e:
+            print(f"[DEBUG] 删除输出文件夹时出错: {str(e)}")
+            return jsonify({'status': 'error', 'message': f'删除输出文件夹时出错: {str(e)}'})
+    
+    # 删除转写记录
+    records = load_transcription_records()
+    records['records'] = [r for r in records['records'] if r['file_name'] != filename]
+    save_transcription_records(records)
+    
+    return jsonify({'status': 'success', 'message': '文件删除成功'})
+
+@app.route('/delete_file_in_output/<folder>/<filename>', methods=['POST'])
+def delete_file_in_output(folder, filename):
+    # 构建文件路径
+    file_path = os.path.join(app.root_path, OUTPUT_FOLDER, folder, filename)
+    print(f"[DEBUG] 尝试删除文件: {file_path}")
     
     if os.path.exists(file_path):
-        os.remove(file_path)
-        return jsonify({'status': 'success'})
+        try:
+            os.remove(file_path)
+            print(f"[DEBUG] 文件删除成功: {file_path}")
+            return jsonify({'status': 'success', 'message': '文件删除成功'})
+        except Exception as e:
+            print(f"[DEBUG] 删除文件时出错: {str(e)}")
+            return jsonify({'status': 'error', 'message': f'删除文件时出错: {str(e)}'})
+    
     return jsonify({'status': 'error', 'message': '文件不存在'})
+
 
 import json
 import sys
@@ -147,7 +200,7 @@ def save_transcription_records(records):
     with open(records_file, 'w', encoding='utf-8') as f:
         json.dump(records, f, indent=2, ensure_ascii=False)
 
-def update_transcription_record(filename, transcribed=False, last_time=None):
+def update_transcription_record(filename, transcribed=False, last_time=None, created_time=None):
     records = load_transcription_records()
     
     # 查找现有记录或创建新记录
@@ -156,7 +209,8 @@ def update_transcription_record(filename, transcribed=False, last_time=None):
         record = {
             'file_name': filename,
             'transcribed': False,
-            'last_transcription_time': None
+            'last_transcription_time': None,
+            'created_time': created_time or time.strftime('%Y-%m-%d %H:%M:%S')
         }
         records['records'].append(record)
     
@@ -165,69 +219,6 @@ def update_transcription_record(filename, transcribed=False, last_time=None):
     record['last_transcription_time'] = last_time
     
     save_transcription_records(records)
-
-# def transcribe_task(filename, steps='12'):
-#     input_file = os.path.join(app.root_path, UPLOAD_FOLDER, filename)
-#     # 为每个文件创建独立的输出文件夹
-#     file_output_dir = os.path.join(app.root_path, OUTPUT_FOLDER, os.path.splitext(filename)[0])
-#     os.makedirs(file_output_dir, exist_ok=True)
-    
-#     # 更新转写状态
-#     update_transcription_record(filename)
-    
-#     try:
-#         # 构建cli.py命令
-#         cmd = [
-#             'python3','-u', # 无缓冲模式！
-#             os.path.join(os.path.dirname(app.root_path), 'cli.py'),
-#             '-i', input_file,
-#             '-o', file_output_dir,
-#             '--steps', steps,  # 执行指定步骤
-#             '--prompts-dir', os.path.join(os.path.dirname(app.root_path),'web','data', 'prompts'),  # 指定prompts目录
-#             '--nobanner'
-#         ]
-        
-#         # 使用Popen执行命令并实时获取输出
-#         process = subprocess.Popen(
-#             cmd,
-#             stdout=subprocess.PIPE,
-#             stderr=subprocess.PIPE,
-#             universal_newlines=True,
-#             bufsize=1
-#         )
-        
-#         # 实时读取stdout和stderr并通过socketio发送
-#         while True:
-#             # 读取stdout
-#             sys.stdout.flush()
-#             output = process.stdout.readline()
-#             if output:
-#                 print(output.strip())
-#                 socketio.emit('transcribe_progress', {'data': output.strip()})
-            
-#             # 读取stderr
-#             error = process.stderr.readline()
-#             if error:
-#                 print(error.strip())
-#                 socketio.emit('transcribe_progress', {'data': error.strip()})
-            
-#             # 检查进程是否结束
-#             if output == '' and error == '' and process.poll() is not None:
-#                 break
-        
-#         # 检查命令执行结果
-#         return_code = process.wait()
-#         if return_code == 0:
-#             # 更新转写记录
-#             update_transcription_record(filename, True, time.strftime('%Y-%m-%d %H:%M:%S'))
-#             # 发送完成消息
-#             socketio.emit('transcribe_complete', {'filename': filename})
-#         else:
-#             error = process.stderr.read()
-#             socketio.emit('transcribe_progress', {'data': f'转写失败: {error}'})
-#     except Exception as e:
-#         socketio.emit('transcribe_progress', {'data': f'转写出错: {str(e)}'})
-
 
 
 def transcribe_task(filename, steps='12'):
@@ -340,4 +331,7 @@ def delete_prompt(filename):
     return jsonify({'status': 'error', 'message': '文件不存在'})
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='127.0.0.1', port=15000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=15000)
+
+    # 生产服务器
+    #socketio.run(app,debug=False,host="192.168.111.2",port=15000)

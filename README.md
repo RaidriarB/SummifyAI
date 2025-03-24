@@ -1,14 +1,35 @@
 # SummifyAI
 
+## 目录
+- [简介](#简介)
+- [功能特性](#功能特性)
+- [安装说明](#安装说明)
+- [使用方法](#使用方法)
+  - [Web端使用](#web端使用)
+  - [命令行使用](#命令行使用)
+- [常见问题](#常见问题)
+- [更新日志](#更新日志)
+
+## 简介
+
 你是否为长达几十分钟甚至一两小时的长视频网课感到头疼？这些视频整体信息密度不高，但偶尔却包含关键知识点，让人不知如何是好。
 
 SummifyAI 能将音频或视频快速转写为文字，并通过自定义 prompt 进行总结精炼、笔记整理、摘要生成等一系列操作，大幅提升你的学习与工作效率。
+
+## 功能特性
+
 - 支持Windows、MacOS
 - 支持多种音频和视频格式输入
 - 基于whisper库在本地进行语音转写
 - 调用 AI 智能添文本修正润色和修正文本，大幅提高准确性（可选用超便宜的deepseek！）
 - 可自定义prompt，进行生成文本摘要和关键信息提取等一系列操作
 - 分步骤处理，可灵活选择执行的功能
+
+<img src="./imgs/web1.png" style="zoom:50%;" />
+<img src="./imgs/web2.png" style="zoom:50%;" />
+<img src="./imgs/web3.png" style="zoom:50%;" />
+
+---
 
 <img src="./imgs/index.png" style="zoom:50%;" />
 
@@ -33,23 +54,31 @@ pip install -r requirements.txt
 
 ## 2 使用方法
 
+### 2.1 web端使用
 ```bash
-usage: main.py [-h] [-i INPUT] [-s STEPS] [-o OUTPUT_DIR]
+cd web && python app.py
+```
+然后访问 http://127.0.0.1:15000 即可
+
+
+### 2.2 命令行使用
+```bash
+usage: cli.py [-h] [-i INPUT] [-s STEPS] [-o OUTPUT_DIR]
 
     音频处理工具 - 将音视频内容转换为文字并进行智能总结
 
     示例用法：
     1. 处理视频文件（执行所有步骤）：
-        python main.py -i video.mp4
+        python cli.py -i video.mp4
 
     2. 处理音频文件并指定输出目录：
-        python main.py -i podcast.mp3 --output-dir my_summary
+        python cli.py -i podcast.mp3 --output-dir my_summary
 
     3. 只执行音频预处理和语音转写：
-        python main.py -i lecture.wav --steps 12
+        python cli.py -i lecture.wav --steps 12
 
     4. 从已有的转写文本开始处理：
-        python main.py -i transcript.txt --steps 34
+        python cli.py -i transcript.txt --steps 34
         
 
 optional arguments:
