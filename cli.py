@@ -15,7 +15,7 @@ import config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-VERSION = 'v1.2.0'
+VERSION = 'v1.3.0'
 AUTHOR = 'RaidriarB'
 
 
