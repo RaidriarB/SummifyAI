@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SummifyAI - 文件管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .progress-container {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        .progress-container::before {
+            content: '> ';
+            color: #569cd6;
+        }
+        .progress-container::after {
+            content: '';
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background-color: #d4d4d4;
+            animation: blink 1s steps(2, start) infinite;
+        }
+        @keyframes blink {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0;
+            }
+        }
+        .table-responsive {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .section-title {
+            margin: 30px 0 20px;
+            color: #333;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .list-group-item.active {
+            background-color: #e9ecef;
+            border-color: #dee2e6;
+            color: #212529;
+        }
+        .list-group-item.active .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">SummifyAI</a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- 文件列表 -->
+        <div class="section-header">
+            <h2 class="section-title mb-0">文件列表</h2>
+            <div class="btn-group">
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#promptModal">
+                    <i class="bi bi-file-text"></i> Prompt管理
+                </button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#downloadModal">
+                    <i class="bi bi-download"></i> 下载音视频
+                </button>
+            </div>
+        </div>
+
+        <!-- 下载视频模态框 -->
+        <div class="modal fade" id="downloadModal" tabindex="-1" aria-labelledby="downloadModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="downloadModalLabel">下载音视频</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="downloadForm">
+                            <div class="mb-3">
+                                <label for="videoUrl" class="form-label">音视频URL</label>
+                                <input type="text" class="form-control" id="videoUrl" name="url" placeholder="输入视频URL" required>
+                            </div>
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-primary">下载</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-borderless">
+                <thead class="table-light" style="border-bottom: 2px solid #dee2e6;">
+                    <tr>
+                        <th>文件名</th>
+                        <th>上次转写时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for file in files %}
+                    <tr>
+                        <td>{{ file.name }}</td>
+                        <td>{{ file.last_time }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '12')">仅转写</button>
+                                <button class="btn btn-outline-info btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '123')">转写+修补</button>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '1234')">转写+修补+AI总结</button>
+                                <div class="btn-group ms-3" role="group">
+                                    <button class="btn btn-info btn-sm me-2" onclick="viewTranscription('{{ file.name }}')">查看转写</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteFile('{{ file.name }}')">删除</button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 转写进度显示 -->
+        <div id="progress" class="progress-container"></div>
+    </div>
+
+    <script>
+        // WebSocket连接
+        const socket = io();
+        const progressDiv = document.getElementById('progress');
+
+        // 监听转写进度
+        socket.on('transcribe_progress', function(data) {
+            progressDiv.innerHTML += data.data + '<br>';
+            progressDiv.scrollTop = progressDiv.scrollHeight;
+        });
+
+        // 监听转写完成
+        socket.on('transcribe_complete', function(data) {
+            progressDiv.innerHTML += '转写完成：' + data.filename + '<br>';
+            progressDiv.scrollTop = progressDiv.scrollHeight;
+        });
+
+        // 开始转写
+        function startTranscribe(filename, steps) {
+            progressDiv.innerHTML = ''; // 清空之前的输出
+            fetch('/transcribe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'filename=' + encodeURIComponent(filename) + '&steps=' + encodeURIComponent(steps)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    progressDiv.innerHTML = '开始转写：' + filename + ' (步骤：' + steps + ')<br>';
+                }
+            });
+        }
+
+        // 下载视频
+        document.getElementById('downloadForm').onsubmit = function(e) {
+            e.preventDefault();
+            const url = this.url.value;
+            fetch('/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'url=' + encodeURIComponent(url)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                }
+            });
+        };
+
+
+
+        // 查看转写结果
+        function viewTranscription(filename) {
+            // 移除文件扩展名
+            const baseFilename = filename.split('.').slice(0, -1).join('.');
+            window.location.href = '/transcribe/' + encodeURIComponent(baseFilename);
+        }
+
+        // 删除文件
+        function deleteFile(filename) {
+            if (!confirm('确定要删除文件 ' + filename + ' 吗？')) {
+                return;
+            }
+            fetch('/delete/' + encodeURIComponent(filename), {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                }
+            });
+        }
+
+        // Prompt管理相关功能
+        let currentPromptFile = '';
+
+        // 加载Prompt列表
+        function loadPromptList() {
+            fetch('/list_prompts')
+                .then(response => response.json())
+                .then(data => {
+                    const promptList = document.getElementById('promptList');
+                    promptList.innerHTML = '';
+                    data.prompts.forEach(prompt => {
+                        const displayName = prompt.replace(/.txt$/, '');
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                        item.setAttribute('data-prompt', prompt);
+                        item.innerHTML = `
+                            <span class="prompt-name">${displayName}</span>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-primary" onclick="viewPrompt('${prompt}')">查看</button>
+                                <button class="btn btn-sm btn-danger" onclick="deletePrompt('${prompt}')">删除</button>
+                            </div>
+                        `;
+                        promptList.appendChild(item);
+                    });
+                });
+        }
+
+        // 创建新的Prompt
+        function createNewPrompt() {
+            const filename = prompt('请输入新Prompt文件名：');
+            if (filename && filename.trim() !== '') {
+                currentPromptFile = filename.endsWith('.txt') ? filename : filename + '.txt';
+                // 设置默认的Prompt模板
+                document.getElementById('promptEditor').value = `# ${filename.replace(/.txt$/, '')} Prompt模板
+
+## 角色定位
+
+## 任务目标
+
+## 输出格式
+
+## 示例输出
+`;
+                savePrompt();
+            } else {
+                alert('文件名不能为空！');
+            }
+        }
+
+        // 查看Prompt内容
+        function viewPrompt(filename) {
+            currentPromptFile = filename;
+            // 移除所有active类
+            document.querySelectorAll('#promptList .list-group-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // 为当前选中项添加active类
+            const selectedItem = document.querySelector(`#promptList .list-group-item[data-prompt="${filename}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('active');
+            }
+            fetch('/view_prompt/' + encodeURIComponent(filename))
+                .then(response => response.text())
+                .then(content => {
+                    document.getElementById('promptEditor').value = content;
+                });
+        }
+
+        // 保存Prompt
+        function savePrompt() {
+            if (!currentPromptFile) {
+                alert('请先选择或创建一个Prompt文件');
+                return;
+            }
+            const content = document.getElementById('promptEditor').value;
+            fetch('/save_prompt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    filename: currentPromptFile,
+                    content: content
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    loadPromptList();
+                    alert('保存成功');
+                } else {
+                    alert('保存失败：' + data.message);
+                }
+            });
+        }
+
+        // 删除Prompt
+        function deletePrompt(filename) {
+            if (!confirm('确定要删除Prompt文件 ' + filename + ' 吗？')) {
+                return;
+            }
+            fetch('/delete_prompt/' + encodeURIComponent(filename), {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    loadPromptList();
+                    if (currentPromptFile === filename) {
+                        currentPromptFile = '';
+                        document.getElementById('promptEditor').value = '';
+                    }
+                }
+            });
+        }
+
+        // 等待DOM加载完成后初始化事件监听
+        document.addEventListener('DOMContentLoaded', function() {
+            const promptModal = document.getElementById('promptModal');
+            if (promptModal) {
+                promptModal.addEventListener('show.bs.modal', function () {
+                    loadPromptList();
+                });
+            }
+        });
+    </script>
+    <!-- Prompt管理模态框 -->
+    <div class="modal fade" id="promptModal" tabindex="-1" aria-labelledby="promptModalLabel" data-bs-backdrop="static" data-bs-keyboard="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="promptModalLabel">Prompt管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <h6>Prompt列表</h6>
+                        <button type="button" class="btn btn-sm btn-success" onclick="createNewPrompt()">新建Prompt</button>
+                    </div>
+                    <div class="list-group mb-3" id="promptList">
+                        <!-- Prompt列表将通过JavaScript动态加载 -->
+                    </div>
+                    <div class="form-group">
+                        <label for="promptEditor" class="form-label">编辑区域</label>
+                        <textarea class="form-control" id="promptEditor" rows="10" style="font-family: monospace;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" onclick="savePrompt()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

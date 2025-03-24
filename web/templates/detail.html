@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SummifyAI - 转写详情</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  marked.setOptions({
+    gfm: true,
+    breaks: true,
+    pedantic: false,
+    smartLists: true,
+    smartypants: false,
+    xhtml: false
+  });
+</script>
+    <style>
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .section-title {
+            margin: 30px 0 20px;
+            color: #333;
+        }
+        .file-list {
+            margin-top: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            padding: 15px;
+        }
+        .file-list .list-group {
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+        .preview-area {
+            height: 50vh;
+            overflow-y: auto;
+            padding: 1rem;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">SummifyAI</a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="section-title mb-0">{{ filename }} 的转写结果</h2>
+            <a href="/" class="btn btn-outline-primary">返回文件列表</a>
+        </div>
+
+        <div class="file-list">
+            <h4>文件列表</h4>
+            <div class="list-group">
+                {% for file in files %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="file-name" data-file="{{ file.name }}" data-folder="{{ filename }}">{{ file.name }}</span>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-primary view-btn" data-file="{{ file.name }}" data-folder="{{ filename }}" style="white-space: nowrap; min-width: 60px;">查看</button>
+                        <a href="/download_file/{{ filename }}/{{ file.name }}" class="btn btn-sm btn-success" style="white-space: nowrap; min-width: 60px;">下载</a>
+                        <button class="btn btn-sm btn-danger delete-btn" data-file="{{ file.name }}" data-folder="{{ filename }}" style="white-space: nowrap; min-width: 60px;">删除</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="preview-area markdown-body" id="markdown-preview">
+        </div>
+        
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const fileName = this.dataset.file;
+                    const folderName = this.dataset.folder;
+                    fetch(`/view_file/${folderName}/${fileName}`)
+                        .then(response => response.text())
+                        .then(content => {
+                            const previewElement = document.getElementById('markdown-preview');
+                            if (previewElement) {
+                                previewElement.innerHTML = marked.parse(content);
+                            } else {
+                                console.error('Preview element not found');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching file content:', error);
+                        });
+                });
+            });
+
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (confirm('确定要删除这个文件吗？')) {
+                        const fileName = this.dataset.file;
+                        const folderName = this.dataset.folder;
+                        fetch(`/delete_file/${folderName}/${fileName}`, { method: 'POST' })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    this.closest('.list-group-item').remove();
+                                }
+                            });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

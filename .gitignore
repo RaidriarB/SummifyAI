@@ -21,6 +21,8 @@ env/
 # Project specific
 output/
 tempdata/
+web/data/
+web/tempdata/
 
 # System files
 .DS_Store
