@@ -59,7 +59,9 @@ def transcribe_audio(audio_path, prompt):
 
         # 调用模型进行转写，传入初始提示词（如果模型支持该参数）
         transcribe_start = time.time()
+        logger.debug(f"转写的音频路径：{audio_path}")
         result = model.transcribe(audio_path, initial_prompt=prompt)
+
         transcribe_time = time.time() - transcribe_start
 
         transcription_text = result.get("text", "").strip()

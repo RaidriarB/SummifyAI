@@ -11,3 +11,7 @@ flask
 flask-socketio
 bilibili-api-python
 yt-dlp
+wechatarticles
+
+# env
+python-dotenv

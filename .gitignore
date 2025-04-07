@@ -37,3 +37,7 @@ test*.py
 
 # deprecated files
 *.deprecated
+
+
+# env file
+.env

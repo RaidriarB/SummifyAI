@@ -9,7 +9,9 @@ from threading import Thread
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!?s3cReT1-df1ocn1oi3ofinsd'
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins='*')
+
+
 
 # 配置文件存储路径
 UPLOAD_FOLDER = 'data/upload'
@@ -18,6 +20,11 @@ OUTPUT_FOLDER = 'data/output'
 # 确保目录存在
 os.makedirs(os.path.join(app.root_path, UPLOAD_FOLDER), exist_ok=True)
 os.makedirs(os.path.join(app.root_path, OUTPUT_FOLDER), exist_ok=True)
+
+
+@app.route('/test')
+def test():
+    return render_template('test.html')
 
 @app.route('/')
 def index():
@@ -330,8 +337,23 @@ def delete_prompt(filename):
             return jsonify({'status': 'error', 'message': str(e)})
     return jsonify({'status': 'error', 'message': '文件不存在'})
 
-if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=15000)
+import logging
+from logging.handlers import RotatingFileHandler
 
-    # 生产服务器
-    #socketio.run(app,debug=False,host="192.168.111.2",port=15000)
+if __name__ == '__main__':
+    # 配置日志
+    # log_handler = RotatingFileHandler('app.log', maxBytes=1000000, backupCount=3)
+    # log_handler.setFormatter(logging.Formatter(
+    #     '%(asctime)s %(levelname)s: %(message)s '
+    #     '[in %(pathname)s:%(lineno)d]'
+    # ))
+    # app.logger.addHandler(log_handler)
+    app.logger.setLevel(logging.INFO)
+
+    # 根据环境变量判断运行模式
+    if os.getenv('FLASK_ENV') == 'production':
+        app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+        print(app.config['SECRET_KEY'])
+        socketio.run(app,allow_unsafe_werkzeug=True,debug=False, host='0.0.0.0', port=15000)
+    else:
+        socketio.run(app, debug=True, host='127.0.0.1', port=15000)

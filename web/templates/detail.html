@@ -108,7 +108,7 @@
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center">
             <h2 class="section-title mb-0">{{ filename }} 的转写结果</h2>
-            <a href="/" class="btn btn-outline-primary">返回文件列表</a>
+            <a href="/" class="btn btn-outline-primary" style="white-space: nowrap">返回文件列表</a>
         </div>
 
         <div class="file-list">
@@ -135,6 +135,24 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.textContent = '切换显示';
+            toggleBtn.className = 'btn btn-outline-primary';
+            toggleBtn.style.marginRight = '10px';
+            toggleBtn.style.whiteSpace = 'nowrap';
+            document.querySelector('.d-flex').prepend(toggleBtn);
+
+            let isMarkdown = true;
+            let originalContent = '';
+
+            // 切换显示模式
+            toggleBtn.addEventListener('click', () => {
+                isMarkdown = !isMarkdown;
+                const previewDiv = document.getElementById('markdown-preview');
+                previewDiv.innerHTML = isMarkdown ? marked.parse(originalContent) : `<pre style="white-space: pre-wrap">${originalContent}</pre>`;
+                toggleBtn.textContent = isMarkdown ? '切换为原始文本' : '切换为Markdown';
+            });
+
             document.querySelectorAll('.view-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const fileName = this.dataset.file;
@@ -142,6 +160,9 @@
                     fetch(`/view_file/${folderName}/${fileName}`)
                         .then(response => response.text())
                         .then(content => {
+                            originalContent = content;
+                            const previewDiv = document.getElementById('markdown-preview');
+                            previewDiv.innerHTML = isMarkdown ? marked.parse(content) : content;
                             const previewElement = document.getElementById('markdown-preview');
                             if (previewElement) {
                                 previewElement.innerHTML = marked.parse(content);

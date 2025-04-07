@@ -1,0 +1,34 @@
+# 虚拟环境
+venv/
+env/
+.env/
+.python-version
+
+# Python缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 日志文件
+*.log
+
+# 测试文件
+test/
+test*.py
+
+# IDE配置文件
+.vscode/
+.idea/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 项目特定文件
+output/
+tempdata/
+web/data/
+web/tempdata/
+
+# 其他
+*.deprecated

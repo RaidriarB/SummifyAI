@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>Markdown 与 Mermaid 示例</title>
+  <!-- 引入 marked -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- 引入适用于浏览器的 mermaid UMD 版本 -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    // 初始化 Mermaid，关闭自动启动
+    mermaid.initialize({ startOnLoad: false });
+
+    // 自定义 marked 渲染器
+    const renderer = new marked.Renderer();
+    renderer.code = function(code, language) {
+      // 确保 code 为字符串
+      const codeStr = typeof code === 'string' ? code : String(code);
+      // 如果指定语言为 mermaid 或代码内容以 graph/sequenceDiagram 开头，则渲染为 Mermaid 图表
+      if ((language && language.toLowerCase() === 'mermaid') || codeStr.match(/^(graph|sequenceDiagram)/)) {
+        return `<div class="mermaid">${codeStr}</div>`;
+      } else {
+        return `<pre><code>${codeStr}</code></pre>`;
+      }
+    };
+
+    // 渲染 Markdown 内容，并初始化 Mermaid 图表
+    function renderMarkdown() {
+      const markdownText = document.getElementById('markdown').value;
+      const htmlContent = marked.parse(markdownText, { renderer: renderer });
+      document.getElementById('preview').innerHTML = htmlContent;
+      // 初始化 Mermaid，重新渲染页面中所有 .mermaid 元素
+      mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('render').addEventListener('click', renderMarkdown);
+    });
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+    }
+    #preview {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Markdown 与 Mermaid 示例</h1>
+  <p>在下面的文本区域输入 Markdown 内容，包含 Mermaid 代码块，然后点击“渲染 Markdown”按钮。</p>
+  <textarea id="markdown">
+# Mermaid 示例
+
+下面是一个 Mermaid 图表示例：
+
+```mermaid
+graph TD;
+    A --> B;
+    A --> C;
+    B --> D;
+    C --> D;
+```
+还有一个 JavaScript 代码块示例：
+```javascript
+console.log("Hello, world!");
+```
+
+</textarea> <br> <button id="render">渲染 Markdown</button> <div id="preview"></div> </body> </html> 

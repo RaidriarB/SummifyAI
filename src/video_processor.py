@@ -5,7 +5,6 @@ import imageio_ffmpeg
 
 logger = logging.getLogger(__name__)
 
-
 def preprocess_video(video_path):
     """
     视频预处理，将视频转换为音频
@@ -45,6 +44,7 @@ def preprocess_video(video_path):
 
         # 获取 ffmpeg 可执行文件的路径，imageio_ffmpeg 会自动下载所需的二进制文件
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        logger.debug(f'使用 ffmpeg 可执行文件: {ffmpeg_exe}')
 
         # 执行 ffmpeg 处理链
         # 如果处理失败，ffmpeg.run 会抛出 ffmpeg.Error 异常

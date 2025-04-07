@@ -9,7 +9,7 @@ import httpx
 import os
 from urllib.parse import urlparse, parse_qs
 
-#logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 
 # credential = Credential(
@@ -19,6 +19,7 @@ from urllib.parse import urlparse, parse_qs
 #     dedeuserid="d",
 #     ac_time_value="d"
 # )
+
 
 def clean_filename(filename):
     """清理文件名，移除不合法字符"""
@@ -128,7 +129,10 @@ def download_audio(bvid,page,save_path):
     download_url_data = sync(v.get_download_url(page_index=page_index))
     # 解析视频下载信息
     detecter = video.VideoDownloadURLDataDetecter(data=download_url_data)
+
+
     streams = detecter.detect_best_streams()
+    #streams = detecter.detect_all()
 
     # 文件名：【作者】标题.mp4
     title = info['title']
@@ -136,8 +140,11 @@ def download_audio(bvid,page,save_path):
     filename = f"[{owner}]{title}.mp4"
     filename = clean_filename(filename)
     logging.debug(f"文件名：{filename}")
+    logging.debug(streams)
 
-    return sync(download_url(streams[1].url,save_path,filename))
+    stream_index = 0
+    if(len(streams) >= 2):stream_index = 1
+    return sync(download_url(streams[stream_index].url,save_path,filename))
 
 # def download_all_pages_audio(bvid,save_path):
 #     v = video.Video(bvid=bvid)
