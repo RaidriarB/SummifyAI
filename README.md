@@ -20,7 +20,7 @@ SummifyAI 能将音频或视频快速转写为文字，并通过自定义 prompt
 
 - 支持Windows、MacOS
 - 支持多种音频和视频格式输入
-- 基于whisper库在本地进行语音转写
+- 支持 Whisper / Paraformer 本地语音转写
 - 调用 AI 智能添文本修正润色和修正文本，大幅提高准确性（可选用超便宜的deepseek！）
 - 可自定义prompt，进行生成文本摘要和关键信息提取等一系列操作
 - 分步骤处理，可灵活选择执行的功能
@@ -28,6 +28,7 @@ SummifyAI 能将音频或视频快速转写为文字，并通过自定义 prompt
 - Web端任务队列，避免并发资源占用
 - 转写/总结输出统一为 Markdown（.md），并支持 Mermaid 渲染
 - 转写结果支持在线查看与编辑保存
+- Web端支持选择转写模型类型与规格，并提供音频预览
 - 日志输出到 `logs/` 目录（可通过环境变量调整）
 - Web端“刷新”按钮支持仅刷新状态
 
@@ -56,7 +57,7 @@ pip install -r requirements.txt
 - 在 `.env` 或环境变量中配置 `API_KEY`（也可直接修改 `config.py`）
 - prompts文件夹中，可编写多个txt文件，作为自定义的prompt，工具会分别处理。
 - 其他高级配置可以暂时不用动
-- **注意：首次使用需要下载whisper库的模型文件，模型文件大小从几十MB、几百MB到1.5GB左右不等**
+- **注意：首次使用需要下载模型文件（Whisper/Paraformer），大小从几十MB到数GB不等**
 
 ## 2 使用方法
 
@@ -109,6 +110,12 @@ optional arguments:
                         
     输出目录，用于存放处理结果（默认：output）
     每个步骤的结果将保存在该目录下
+  --transcribe-model-type TRANSCRIBE_MODEL_TYPE
+                        
+    语音转写模型类型（whisper / paraformer）
+  --transcribe-model-size TRANSCRIBE_MODEL_SIZE
+                        
+    模型规格或名称（如 whisper 的 tiny/base/small/medium/large-v3-turbo；paraformer-zh 等）
 ```
 提示：转写/修正/总结输出文件为 `.md` 格式。
 ## 3 常见问题
@@ -140,6 +147,7 @@ export HTTPS_PROXY=http://127.0.0.1:7897
 ## 其他
 
 更新日志：
+- 2026-02-08 支持 Paraformer 转写与 Web 端模型选择，详情页增加音频预览
 - 2026-02-08 Web端批量上传、任务队列、在线编辑、输出改为 Markdown
 - 2025-03-24 增加web界面，同时支持爬取bilibili和小宇宙的音视频
 - 2025-03-22 直接使用whisper库，无需再下载buzz

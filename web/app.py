@@ -2,14 +2,16 @@ from flask import Flask, render_template, request, jsonify, send_file
 from flask_socketio import SocketIO
 import os
 import time
-import pty
 import logging
 import subprocess
 import json
 import sys
+import re
 from pathlib import Path
 from threading import Thread, Lock
 from queue import Queue
+
+IS_WINDOWS = os.name == "nt"
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret')
@@ -39,6 +41,8 @@ setup_logging(
     backup_count=config.LOG_BACKUP_COUNT,
 )
 logger = logging.getLogger(__name__)
+
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 ALLOWED_EXTS = {
     ".mp4", ".avi", ".mkv", ".mov", ".flv", ".webm", ".m4v",
@@ -88,18 +92,45 @@ def ensure_unique_path(directory, filename):
     return candidate
 
 
+def clean_output_line(line):
+    if line is None:
+        return ""
+    line = ANSI_ESCAPE_RE.sub("", line)
+    return line.replace("\r", "").strip()
+
+
+def should_skip_output(line):
+    if not line:
+        return True
+    stripped = line.strip()
+    if not stripped:
+        return True
+    if stripped.startswith("0% ") or stripped.startswith("100% "):
+        return True
+    if "it/s" in stripped:
+        return True
+    if "rtf_avg" in stripped:
+        return True
+    if "time_speech" in stripped and "time_escape" in stripped:
+        return True
+    if "load_data" in stripped and "extract_feat" in stripped and "forward" in stripped:
+        return True
+    if stripped.startswith("{'load_data'") or stripped.startswith('{"load_data"'):
+        return True
+    return False
+
+
 def task_worker():
     while True:
-        filename, steps = task_queue.get()
+        filename, steps, model_type, model_size = task_queue.get()
         try:
-            transcribe_task(filename, steps)
+            transcribe_task(filename, steps, model_type, model_size)
         finally:
             task_queue.task_done()
 
-
-def enqueue_task(filename, steps):
+def enqueue_task(filename, steps, model_type=None, model_size=None):
     global worker_thread
-    task_queue.put((filename, steps))
+    task_queue.put((filename, steps, model_type, model_size))
     with worker_lock:
         if worker_thread is None or not worker_thread.is_alive():
             worker_thread = Thread(target=task_worker, daemon=True)
@@ -174,6 +205,7 @@ def download_video():
     
     from crawler import download_media
     upload_dir = os.path.join(app.root_path, UPLOAD_FOLDER)
+    master_fd = None
     try:
         filename = download_media(url, upload_dir)
         if filename:
@@ -197,6 +229,8 @@ def upload_files():
     files = request.files.getlist('files')
     steps = request.form.get('steps', '12')
     auto_start = request.form.get('auto_start', '1') == '1'
+    model_type = (request.form.get('model_type') or '').strip() or None
+    model_size = (request.form.get('model_size') or '').strip() or None
 
     if not files:
         return jsonify({'status': 'error', 'code': Codes.INVALID_ARGS, 'message': '未选择文件'})
@@ -225,7 +259,7 @@ def upload_files():
             saved.append(final_name)
             update_transcription_record(final_name, created_time=time.strftime('%Y-%m-%d %H:%M:%S'))
             if auto_start:
-                enqueue_task(final_name, steps)
+                enqueue_task(final_name, steps, model_type, model_size)
                 queued.append(final_name)
             logger.info(f"上传成功: {final_name}")
         except Exception as e:
@@ -240,6 +274,8 @@ def upload_files():
 def start_transcribe():
     filename = request.form.get('filename')
     steps = request.form.get('steps', '12')  # 默认只执行转写步骤
+    model_type = (request.form.get('model_type') or '').strip() or None
+    model_size = (request.form.get('model_size') or '').strip() or None
 
     if not filename:
         return jsonify({'status': 'error', 'code': Codes.INVALID_ARGS, 'message': '未提供文件名'})
@@ -248,13 +284,14 @@ def start_transcribe():
     if not os.path.exists(os.path.join(app.root_path, UPLOAD_FOLDER, filename)):
         return jsonify({'status': 'error', 'code': Codes.INPUT_NOT_FOUND, 'message': '文件不存在'})
     
-    enqueue_task(filename, steps)
+    enqueue_task(filename, steps, model_type, model_size)
     return jsonify({'status': 'success', 'code': Codes.SUCCESS, 'message': '已加入任务队列'})
 
 @app.route('/transcribe/<filename>')
 def view_transcription(filename):
     # 获取输出目录路径
-    file_output_dir = os.path.join(app.root_path, OUTPUT_FOLDER, os.path.splitext(filename)[0])
+    base_name = os.path.splitext(filename)[0]
+    file_output_dir = os.path.join(app.root_path, OUTPUT_FOLDER, base_name)
     
     # 获取目录下的所有文件
     files = []
@@ -286,7 +323,26 @@ def view_transcription(filename):
     else:
         content = '未找到转写结果文件'
     
-    return render_template('detail.html', filename=filename, files=files, content=content, default_file=default_file)
+    # 查找原始音视频文件（用于预览）
+    source_file = None
+    upload_dir = os.path.join(app.root_path, UPLOAD_FOLDER)
+    if os.path.exists(upload_dir):
+        candidates = [
+            f for f in os.listdir(upload_dir)
+            if is_allowed_file(f) and os.path.splitext(f)[0] == base_name
+        ]
+        candidates.sort()
+        if candidates:
+            source_file = candidates[0]
+
+    return render_template(
+        'detail.html',
+        filename=filename,
+        files=files,
+        content=content,
+        default_file=default_file,
+        source_file=source_file,
+    )
 
 @app.route('/view_file/<path:filename>')
 def view_file(filename):
@@ -313,6 +369,17 @@ def download_file(filename):
     if os.path.exists(file_path):
         return send_file(file_path, as_attachment=True)
     return '文件不存在'
+
+@app.route('/source_file/<path:filename>')
+def source_file(filename):
+    upload_root = os.path.join(app.root_path, UPLOAD_FOLDER)
+    target_path = os.path.abspath(os.path.normpath(os.path.join(upload_root, filename)))
+    upload_root_abs = os.path.abspath(upload_root)
+    if os.path.commonpath([upload_root_abs, target_path]) != upload_root_abs:
+        return '非法路径'
+    if not os.path.exists(target_path):
+        return '文件不存在'
+    return send_file(target_path, conditional=True)
 
 
 @app.route('/save_output_file/<folder>/<path:filename>', methods=['POST'])
@@ -432,13 +499,13 @@ def update_transcription_record(filename, transcribed=False, last_time=None, cre
     save_transcription_records(records)
 
 
-def transcribe_task(filename, steps='12'):
+def transcribe_task(filename, steps='12', model_type=None, model_size=None):
     input_file = os.path.join(app.root_path, UPLOAD_FOLDER, filename)
     file_output_dir = os.path.join(app.root_path, OUTPUT_FOLDER, os.path.splitext(filename)[0])
     os.makedirs(file_output_dir, exist_ok=True)
     
     update_transcription_record(filename)
-    logger.info(f"开始任务: {filename} steps={steps}")
+    logger.info(f"开始任务: {filename} steps={steps} model_type={model_type or 'default'} model_size={model_size or 'default'}")
     socketio.emit('transcribe_progress', {'data': f'开始转写：{filename} (步骤：{steps})'})
     
     cmd = [
@@ -451,36 +518,54 @@ def transcribe_task(filename, steps='12'):
         '--prompts-dir', str(WEB_DIR / 'data' / 'prompts'),
         '--nobanner'
     ]
+    if model_type:
+        cmd.extend(['--transcribe-model-type', model_type])
+    if model_size:
+        cmd.extend(['--transcribe-model-size', model_size])
     
-    master_fd = None
     try:
-        # 创建伪终端
-        master_fd, slave_fd = pty.openpty()
-        
-        process = subprocess.Popen(
-            cmd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            text=True,
-            bufsize=1
-        )
-        os.close(slave_fd)  # 关闭子进程中不再需要的文件描述符
-        
-        # 实时读取输出
-        while True:
-            try:
-                output = os.read(master_fd, 1024).decode()
-            except OSError:
-                break
-            if output:
-                # 将输出按行拆分并逐行发送
-                for line in output.splitlines():
-                    print(line)
-                    socketio.emit('transcribe_progress', {'data': line})
-            if process.poll() is not None:
-                break
-        
-        return_code = process.wait()
+        if IS_WINDOWS:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            if process.stdout:
+                for line in process.stdout:
+                    line = clean_output_line(line)
+                    if not should_skip_output(line):
+                        socketio.emit('transcribe_progress', {'data': line})
+            return_code = process.wait()
+        else:
+            import pty
+            master_fd, slave_fd = pty.openpty()
+            process = subprocess.Popen(
+                cmd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                text=True,
+                bufsize=1
+            )
+            os.close(slave_fd)  # 关闭子进程中不再需要的文件描述符
+            
+            # 实时读取输出
+            while True:
+                try:
+                    output = os.read(master_fd, 1024).decode()
+                except OSError:
+                    break
+                if output:
+                    # 将输出按行拆分并逐行发送
+                    for line in output.splitlines():
+                        line = clean_output_line(line)
+                        if not should_skip_output(line):
+                            socketio.emit('transcribe_progress', {'data': line})
+                if process.poll() is not None:
+                    break
+            
+            return_code = process.wait()
         if return_code == 0:
             update_transcription_record(filename, True, time.strftime('%Y-%m-%d %H:%M:%S'))
             socketio.emit('transcribe_complete', {'filename': filename})
@@ -492,7 +577,7 @@ def transcribe_task(filename, steps='12'):
         socketio.emit('transcribe_progress', {'data': f'转写出错: {str(e)}'})
         logger.error(format_message(Codes.TASK_FAIL, '转写出错', f'file={filename} err={e}'))
     finally:
-        if master_fd is not None:
+        if not IS_WINDOWS:
             try:
                 os.close(master_fd)
             except Exception:

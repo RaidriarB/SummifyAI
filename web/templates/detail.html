@@ -55,6 +55,11 @@
             gap: 20px;
             margin-top: 12px;
         }
+        .right-panel-stack {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+        }
         .panel {
             background: var(--surface);
             border: 1px solid var(--border-color);
@@ -119,6 +124,19 @@
             padding: 16px 18px;
             background: #fff;
         }
+        .media-preview {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 10px;
+            color: #e2e8f0;
+        }
+        .media-preview audio {
+            width: 100%;
+            height: 36px;
+            display: block;
+            border-radius: 10px;
+            background: #0b1020;
+        }
         .editor-area {
             width: 100%;
             min-height: 60vh;
@@ -175,6 +193,9 @@
         @media (max-width: 992px) {
             .detail-shell {
                 grid-template-columns: 1fr;
+            }
+            .right-panel-stack {
+                grid-template-rows: auto;
             }
             .preview-area {
                 max-height: none;
@@ -240,21 +261,39 @@
                 </div>
             </div>
 
-            <div class="panel">
-                <div class="panel-header">
-                    <div>
-                        <div class="panel-title">预览</div>
-                        <div class="file-meta">当前文件：<span class="current-file" id="current-file">{{ default_file or '未选择' }}</span></div>
+            <div class="right-panel-stack">
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">原始音视频预览</div>
                     </div>
-                    <div class="preview-toolbar">
-                        <button class="btn btn-outline-secondary" id="edit-toggle">编辑</button>
-                        <button class="btn btn-outline-success" id="save-edit" style="display: none;">保存</button>
-                        <button class="btn btn-outline-danger" id="cancel-edit" style="display: none;">取消</button>
-                        <button class="btn btn-outline-primary" id="toggle-view">切换为原始文本</button>
+                    <div class="panel-body">
+                        {% if source_file %}
+                        <div class="media-preview">
+                            <audio controls preload="metadata" src="/source_file/{{ source_file|urlencode }}"></audio>
+                            <div class="file-meta mt-2">{{ source_file }}</div>
+                        </div>
+                        {% else %}
+                        <div class="text-muted">未找到原始音视频文件</div>
+                        {% endif %}
                     </div>
                 </div>
-                <div class="preview-area markdown-body" id="markdown-preview"></div>
-                <textarea class="editor-area" id="markdown-editor" style="display: none;"></textarea>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <div class="panel-title">预览</div>
+                            <div class="file-meta">当前文件：<span class="current-file" id="current-file">{{ default_file or '未选择' }}</span></div>
+                        </div>
+                        <div class="preview-toolbar">
+                            <button class="btn btn-outline-secondary" id="edit-toggle">编辑</button>
+                            <button class="btn btn-outline-success" id="save-edit" style="display: none;">保存</button>
+                            <button class="btn btn-outline-danger" id="cancel-edit" style="display: none;">取消</button>
+                            <button class="btn btn-outline-primary" id="toggle-view">切换为原始文本</button>
+                        </div>
+                    </div>
+                    <div class="preview-area markdown-body" id="markdown-preview"></div>
+                    <textarea class="editor-area" id="markdown-editor" style="display: none;"></textarea>
+                </div>
             </div>
         </div>
     </div>

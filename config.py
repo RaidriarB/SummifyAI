@@ -25,6 +25,17 @@ CLAUDE_MODEL = os.getenv('CLAUDE_MODEL', 'claude-3.5-Sonnet')
 '''
 TRANS_MODEL_SIZE = os.getenv('TRANS_MODEL_SIZE', 'large-v3-turbo')
 
+'''
+选择语音转写模型类型
+whisper 或 paraformer
+'''
+TRANS_MODEL_TYPE = os.getenv('TRANS_MODEL_TYPE', 'whisper').lower()
+
+# Paraformer 默认配置
+TRANS_PARA_VAD_MODEL = os.getenv('TRANS_PARA_VAD_MODEL', 'fsmn-vad')
+TRANS_PARA_PUNC_MODEL = os.getenv('TRANS_PARA_PUNC_MODEL', 'ct-punc')
+TRANS_PARA_BATCH_SIZE_S = int(os.getenv('TRANS_PARA_BATCH_SIZE_S', '300'))
+
 
 ############################
 #     高级设置，请谨慎修改！  #
@@ -49,7 +60,7 @@ LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', '3'))
 
 
 '''选用的语音转写模型
-whispercpp fasterwhisper whisper
+whisper 或 paraformer
 '''
 # TODO 未来再支持faster-whisper
 # whisper已经很好用，而faster-whisper只支持cuda mode，Macbook M系列和windows都不太适合

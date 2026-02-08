@@ -130,6 +130,24 @@ def main():
 用于存放AI总结时使用的提示词文件
                       ''')
 
+    parser.add_argument('--transcribe-model-type',
+                      default=None,
+                      help='''
+语音转写模型类型（可选）：
+- whisper
+- paraformer
+为空则使用 config.py 或环境变量配置
+                      ''')
+
+    parser.add_argument('--transcribe-model-size',
+                      default=None,
+                      help='''
+语音转写模型大小或名称（可选）。
+示例：whisper 可用 tiny/base/small/medium/large-v3/large-v3-turbo
+paraformer 可用 paraformer-zh/paraformer-en/paraformer-zh-streaming 等
+为空则使用 config.py 或环境变量配置
+                      ''')
+
     parser.add_argument('--nobanner',
                       action='store_true',
                       default=False,
@@ -211,7 +229,12 @@ def main():
         if 2 in steps:
             logger.info('步骤2：开始语音转写')
             prompt = '将以下音频转写成中文文本,确保使用正确的标点符号。'
-            transcribed_file = transcribe_audio(current_file, prompt)
+            transcribed_file = transcribe_audio(
+                current_file,
+                prompt,
+                model_type=args.transcribe_model_type,
+                model_size=args.transcribe_model_size,
+            )
             if not transcribed_file:
                 logger.error(format_message(Codes.TRANSCRIBE_FAIL, '语音转写失败'))
                 return

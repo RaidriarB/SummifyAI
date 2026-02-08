@@ -70,6 +70,11 @@
         .col-name {
             width: 52%;
             word-break: break-all;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .table tbody .col-name {
+            background: #f5f7fa;
         }
         .col-time {
             width: 180px;
@@ -125,6 +130,16 @@
                 align-items: stretch;
                 gap: 10px;
             }
+            .page-toolbar {
+                flex-direction: column-reverse;
+                align-items: stretch;
+            }
+            .page-toolbar .toolbar-right {
+                justify-content: flex-start;
+            }
+            .toolbar-actions {
+                grid-template-columns: repeat(2, minmax(120px, 1fr));
+            }
 
             .modal-dialog {
                 margin: 20px;
@@ -172,6 +187,34 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+        }
+        .page-toolbar {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .page-toolbar .toolbar-left {
+            flex: 1 1 auto;
+            min-width: 320px;
+        }
+        .page-toolbar .toolbar-right {
+            display: flex;
+            justify-content: flex-end;
+            align-items: stretch;
+            min-width: 320px;
+        }
+        .toolbar-card {
+            width: 100%;
+        }
+        .toolbar-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(140px, 1fr));
+            gap: 10px;
+        }
+        .toolbar-actions .btn {
+            width: 100%;
         }
         .list-group-item {
             border: 1px solid var(--border-color);
@@ -254,6 +297,21 @@
             border-radius: 10px;
             background: #f9fafb;
         }
+        .model-help-icon {
+            margin-left: 6px;
+            font-size: 0.95rem;
+            color: #6c757d;
+            cursor: help;
+        }
+        .model-help-icon:hover {
+            color: #0d6efd;
+        }
+        .model-tooltip .tooltip-inner {
+            max-width: 360px;
+            text-align: left;
+            font-size: 0.85rem;
+            padding: 8px 10px;
+        }
         @media (max-width: 992px) {
             .prompt-shell {
                 grid-template-columns: 1fr;
@@ -271,22 +329,56 @@
     </nav>
 
     <div class="container mt-4">
-        <!-- 已下载文件列表 -->
-        <div class="section-header">
-            <h2 class="section-title mb-0">已下载文件列表</h2>
-            <div class="btn-group">
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#promptModal">
-                    <i class="bi bi-file-earmark-text"></i> Prompt管理
-                </button>
-                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                    <i class="bi bi-upload"></i> 上传本地文件
-                </button>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#downloadModal">
-                    <i class="bi bi-cloud-download"></i> 下载音视频
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="refreshStatus()">
-                    <i class="bi bi-arrow-clockwise"></i> 刷新
-                </button>
+        <div class="page-toolbar">
+            <div class="toolbar-left">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4 col-lg-3">
+                                <label for="transcribeModelType" class="form-label fw-bold">模型类型</label>
+                                <select class="form-select" id="transcribeModelType">
+                                    <option value="whisper" selected>Whisper</option>
+                                    <option value="paraformer">Paraformer</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8 col-lg-6">
+                                <label for="transcribeModelSize" class="form-label fw-bold">
+                                    模型规格
+                                    <i
+                                        class="bi bi-question-circle model-help-icon"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="right"
+                                        data-bs-html="true"
+                                        data-bs-custom-class="model-tooltip"
+                                        title="Whisper：tiny / base / small / medium / large-v3 / large-v3-turbo<br>Paraformer：paraformer-zh / paraformer-en（离线转写）<br>提示：Paraformer 更适合中文，Whisper 更适合英文。"
+                                    ></i>
+                                </label>
+                                <select class="form-select" id="transcribeModelSize"></select>
+                                <input class="form-control mt-2 d-none" id="transcribeModelSizeCustom" placeholder="输入自定义模型名（如：paraformer-zh 或 whisper 自定义版本）">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="toolbar-right">
+                <div class="card shadow-sm toolbar-card">
+                    <div class="card-body">
+                        <div class="toolbar-actions">
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#promptModal">
+                                <i class="bi bi-file-earmark-text"></i> Prompt管理
+                            </button>
+                            <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                                <i class="bi bi-upload"></i> 上传本地文件
+                            </button>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#downloadModal">
+                                <i class="bi bi-cloud-download"></i> 下载音视频
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="refreshStatus()">
+                                <i class="bi bi-arrow-clockwise"></i> 刷新
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -404,6 +496,68 @@
         const socket = io();
         const progressDiv = document.getElementById('progress');
 
+        const MODEL_OPTIONS = {
+            whisper: [
+                { value: 'tiny', label: 'tiny' },
+                { value: 'base', label: 'base' },
+                { value: 'small', label: 'small' },
+                { value: 'medium', label: 'medium' },
+                { value: 'large-v3', label: 'large-v3' },
+                { value: 'large-v3-turbo', label: 'large-v3-turbo' },
+                { value: '__custom__', label: '自定义...' }
+            ],
+            paraformer: [
+                { value: 'paraformer-zh', label: 'paraformer-zh (中文离线)' },
+                { value: 'paraformer-en', label: 'paraformer-en (英文离线)' },
+                { value: '__custom__', label: '自定义...' }
+            ]
+        };
+
+        function getSelectedModelConfig() {
+            const typeSelect = document.getElementById('transcribeModelType');
+            const sizeSelect = document.getElementById('transcribeModelSize');
+            const customInput = document.getElementById('transcribeModelSizeCustom');
+            const type = typeSelect ? typeSelect.value : 'whisper';
+            let size = sizeSelect ? sizeSelect.value : '';
+            if (size === '__custom__') {
+                size = (customInput ? customInput.value : '').trim();
+            }
+            return { type, size };
+        }
+
+        function setModelSizeOptions(modelType) {
+            const sizeSelect = document.getElementById('transcribeModelSize');
+            const customInput = document.getElementById('transcribeModelSizeCustom');
+            if (!sizeSelect) return;
+            sizeSelect.innerHTML = '';
+            (MODEL_OPTIONS[modelType] || []).forEach(option => {
+                const el = document.createElement('option');
+                el.value = option.value;
+                el.textContent = option.label;
+                sizeSelect.appendChild(el);
+            });
+            const defaultValue = modelType === 'paraformer' ? 'paraformer-zh' : 'large-v3-turbo';
+            if (MODEL_OPTIONS[modelType]) {
+                sizeSelect.value = defaultValue;
+            }
+            if (customInput) {
+                customInput.classList.add('d-none');
+                customInput.value = '';
+            }
+        }
+
+        function handleModelSizeChange() {
+            const sizeSelect = document.getElementById('transcribeModelSize');
+            const customInput = document.getElementById('transcribeModelSizeCustom');
+            if (!sizeSelect || !customInput) return;
+            if (sizeSelect.value === '__custom__') {
+                customInput.classList.remove('d-none');
+                customInput.focus();
+            } else {
+                customInput.classList.add('d-none');
+            }
+        }
+
         // 监听转写进度
         socket.on('transcribe_progress', function(data) {
             progressDiv.innerHTML += data.data + '<br>';
@@ -420,12 +574,18 @@
         // 开始转写
         function startTranscribe(filename, steps) {
             progressDiv.innerHTML = ''; // 清空之前的输出
+            const modelConfig = getSelectedModelConfig();
+            const params = new URLSearchParams();
+            params.set('filename', filename);
+            params.set('steps', steps);
+            if (modelConfig.type) params.set('model_type', modelConfig.type);
+            if (modelConfig.size) params.set('model_size', modelConfig.size);
             fetch('/transcribe', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: 'filename=' + encodeURIComponent(filename) + '&steps=' + encodeURIComponent(steps)
+                body: params.toString()
             })
             .then(response => response.json())
             .then(data => {
@@ -560,6 +720,7 @@
             }
             const steps = document.getElementById('uploadSteps').value;
             const autoStart = document.getElementById('uploadAutoStart').checked;
+            const modelConfig = getSelectedModelConfig();
 
             const formData = new FormData();
             for (const file of files) {
@@ -567,6 +728,8 @@
             }
             formData.append('steps', steps);
             formData.append('auto_start', autoStart ? '1' : '0');
+            if (modelConfig.type) formData.append('model_type', modelConfig.type);
+            if (modelConfig.size) formData.append('model_size', modelConfig.size);
 
             progressDiv.innerHTML = '开始上传 ' + files.length + ' 个文件...<br>';
             fetch('/upload', {
@@ -738,6 +901,20 @@
 
         // 等待DOM加载完成后初始化事件监听
         document.addEventListener('DOMContentLoaded', function() {
+            const typeSelect = document.getElementById('transcribeModelType');
+            if (typeSelect) {
+                setModelSizeOptions(typeSelect.value);
+                typeSelect.addEventListener('change', function() {
+                    setModelSizeOptions(typeSelect.value);
+                });
+            }
+            const sizeSelect = document.getElementById('transcribeModelSize');
+            if (sizeSelect) {
+                sizeSelect.addEventListener('change', handleModelSizeChange);
+            }
+            if (!initTooltips()) {
+                window.addEventListener('load', initTooltips);
+            }
             const promptModal = document.getElementById('promptModal');
             if (promptModal) {
                 promptModal.addEventListener('show.bs.modal', function () {
@@ -758,6 +935,16 @@
                 const name = item.getAttribute('data-name') || '';
                 item.style.display = name.includes(keyword) ? '' : 'none';
             });
+        }
+
+        function initTooltips() {
+            if (!window.bootstrap || !bootstrap.Tooltip) {
+                return false;
+            }
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+                new bootstrap.Tooltip(el);
+            });
+            return true;
         }
     </script>
     <!-- Prompt管理模态框 -->
