@@ -58,7 +58,7 @@ def download_from_url(url, save_path):
         save_path (str): 保存路径
         
     Returns:
-        bool: 下载是否成功
+        str | None: 下载成功返回文件名，失败返回 None
     """
     # 设置请求头
     headers = {
@@ -77,12 +77,12 @@ def download_from_url(url, save_path):
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200:
             print(f"请求失败，状态码：{response.status_code}")
-            return False
+            return None
             
         title, audio_url = extract_next_data(response.text)
         if not audio_url:
             print("未找到音频下载链接")
-            return False
+            return None
         
         if not title:
             print("未找到播客标题，使用URL作为文件名")
@@ -100,7 +100,7 @@ def download_from_url(url, save_path):
         audio_response = requests.get(audio_url, headers=headers, stream=True)
         if audio_response.status_code != 200:
             print(f"下载音频失败，状态码：{audio_response.status_code}")
-            return False
+            return None
             
         with open(file_path, 'wb') as f:
             for chunk in audio_response.iter_content(chunk_size=8192):
@@ -108,14 +108,14 @@ def download_from_url(url, save_path):
                     f.write(chunk)
                     
         print(f"音频文件下载完成：{file_path}")
-        return True
+        return file_name
         
     except requests.exceptions.RequestException as e:
         print(f"请求发生错误：{e}")
-        return False
+        return None
     except Exception as e:
         print(f"下载过程发生错误：{e}")
-        return False
+        return None
 
 if __name__ == '__main__':
     url = "https://www.xiaoyuzhoufm.com/episode/6495c2c9932f350aaee96480"

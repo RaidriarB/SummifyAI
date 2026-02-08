@@ -508,8 +508,9 @@ def transcribe_task(filename, steps='12', model_type=None, model_size=None):
     logger.info(f"开始任务: {filename} steps={steps} model_type={model_type or 'default'} model_size={model_size or 'default'}")
     socketio.emit('transcribe_progress', {'data': f'开始转写：{filename} (步骤：{steps})'})
     
+    python_exec = sys.executable or 'python'
     cmd = [
-        'python3',  # 如果 cli.py 是 Python 脚本，仍然可以保留 -u 参数
+        python_exec,
         '-u',
         str(ROOT_DIR / 'cli.py'),
         '-i', input_file,

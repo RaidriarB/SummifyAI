@@ -31,10 +31,9 @@ def download_media(url, output_dir):
 
     # 调用相应平台的下载函数
     if platform == 'bilibili':
-        return download_bilibili_from_url(url,output_dir)
+        return download_bilibili_from_url(url, output_dir)
     elif platform == 'xiaoyuzhou':
         return download_xiaoyuzhou_from_url(url, output_dir)
     else:
         print('不支持的平台')
         return None
-

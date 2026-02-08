@@ -144,7 +144,8 @@ def download_audio(bvid,page,save_path):
 
     stream_index = 0
     if(len(streams) >= 2):stream_index = 1
-    return sync(download_url(streams[stream_index].url,save_path,filename))
+    ok = sync(download_url(streams[stream_index].url, save_path, filename))
+    return filename if ok else None
 
 # def download_all_pages_audio(bvid,save_path):
 #     v = video.Video(bvid=bvid)
@@ -202,7 +203,7 @@ async def parse_bilibili_url(url: str) -> tuple[str, int | None]:
 
     return bvid, page
 
-def download_from_url(url: str, save_path: str) -> bool:
+def download_from_url(url: str, save_path: str) -> str | None:
     '''
     通过B站视频URL直接下载视频
     :param url: B站视频URL，支持长链接和短链接(b23.tv)
@@ -215,7 +216,7 @@ def download_from_url(url: str, save_path: str) -> bool:
         return download_audio(bvid, page, save_path)
     except Exception as e:
         logging.error(f"下载失败：{e}")
-        return False
+        return None
 
 if __name__ == '__main__':
     ROOT_PATH = os.path.abspath(os.path.dirname(__file__))
