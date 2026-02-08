@@ -56,12 +56,42 @@
             margin-top: 20px;
             max-height: 400px;
             overflow-y: auto;
-            overflow-x: hidden;
+            overflow-x: auto;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 15px;
             box-shadow: 0 2px 4px var(--shadow-color);
             background-color: #fff;
+        }
+        .table-fixed {
+            table-layout: auto;
+            width: 100%;
+        }
+        .col-name {
+            width: 52%;
+            word-break: break-all;
+        }
+        .col-time {
+            width: 180px;
+            white-space: nowrap;
+            text-align: center;
+        }
+        .col-actions {
+            width: 360px;
+            white-space: normal;
+        }
+        .col-actions .btn-group {
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .col-actions .btn {
+            white-space: nowrap;
+            margin-bottom: 6px;
+        }
+        @media (max-width: 1200px) {
+            .col-actions {
+                width: auto;
+            }
         }
         .table {
             margin-bottom: 0;
@@ -162,6 +192,73 @@
             background-color: #0d6efd;
             border-color: #0d6efd;
         }
+        .prompt-shell {
+            display: grid;
+            grid-template-columns: minmax(220px, 280px) 1fr;
+            gap: 16px;
+        }
+        .prompt-panel {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            height: 100%;
+        }
+        .prompt-panel h6 {
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .prompt-search {
+            margin-bottom: 10px;
+        }
+        .prompt-editor-panel {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        #promptModal .modal-dialog {
+            height: 80vh;
+        }
+        #promptModal .modal-content {
+            height: 100%;
+        }
+        #promptModal .modal-body {
+            height: calc(100% - 120px);
+            overflow: hidden;
+        }
+        #promptModal .prompt-shell {
+            height: 100%;
+        }
+        #promptModal .prompt-panel,
+        #promptModal .prompt-editor-panel {
+            height: 100%;
+        }
+        .prompt-editor-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .prompt-editor-toolbar .hint {
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
+        #promptEditor {
+            flex: 1;
+            min-height: 320px;
+            border-radius: 10px;
+            background: #f9fafb;
+        }
+        @media (max-width: 992px) {
+            .prompt-shell {
+                grid-template-columns: 1fr;
+            }
+        }
 
         
     </style>
@@ -181,8 +278,14 @@
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#promptModal">
                     <i class="bi bi-file-earmark-text"></i> Prompt管理
                 </button>
+                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="bi bi-upload"></i> 上传本地文件
+                </button>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#downloadModal">
                     <i class="bi bi-cloud-download"></i> 下载音视频
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="refreshStatus()">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新
                 </button>
             </div>
         </div>
@@ -216,20 +319,61 @@
                 </div>
             </div>
         </div>
+
+        <!-- 本地上传模态框 -->
+        <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title" id="uploadModalLabel">上传本地文件</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <form id="uploadForm">
+                            <div class="mb-3">
+                                <label for="uploadFiles" class="form-label fw-bold">选择文件（支持多选）</label>
+                                <input class="form-control" type="file" id="uploadFiles" name="files" multiple required
+                                    accept=".mp4,.avi,.mkv,.mov,.flv,.webm,.m4v,.mp3,.wav,.m4a,.aac,.flac,.ogg,.txt">
+                                <div class="form-text">支持音频/视频/文本文件，上传后可建立任务。</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="uploadSteps" class="form-label fw-bold">任务步骤</label>
+                                <select class="form-select" id="uploadSteps">
+                                    <option value="12">只做转写（12）</option>
+                                    <option value="123">转后修补（123）</option>
+                                    <option value="1234">转补总结（1234）</option>
+                                    <option value="34">仅AI处理（34，需要txt输入）</option>
+                                </select>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="uploadAutoStart" checked>
+                                <label class="form-check-label" for="uploadAutoStart">上传后自动建立任务</label>
+                            </div>
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-upload me-2"></i>开始上传
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="table-responsive">
-            <table class="table table-striped table-hover table-borderless">
+            <table class="table table-striped table-hover table-borderless table-fixed">
                 <thead class="table-light" style="border-bottom: 2px solid #dee2e6;">
                     <tr>
-                        <th>文件名</th>
-                        <th>上次转写时间</th>
-                        <th>操作</th>
+                        <th class="col-name">文件名</th>
+                        <th class="col-time">上次转写时间</th>
+                        <th class="col-actions">操作</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="filesBody">
                     {% for file in files %}
                     <tr>
-                        <td>{{ file.name }}</td>
-                        <td>{{ file.last_time }}</td>
+                        <td class="col-name">{{ file.name }}</td>
+                        <td class="col-time">{{ file.last_time }}</td>
                         <td>
                             <div class="btn-group" role="group">
                                 <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '12')">只做转写</button>
@@ -270,6 +414,7 @@
         socket.on('transcribe_complete', function(data) {
             progressDiv.innerHTML += '转写完成：' + data.filename + '<br>';
             progressDiv.scrollTop = progressDiv.scrollHeight;
+            updateFileList();
         });
 
         // 开始转写
@@ -285,7 +430,9 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    progressDiv.innerHTML = '开始转写：' + filename + ' (步骤：' + steps + ')<br>';
+                    progressDiv.innerHTML = '已加入任务队列：' + filename + ' (步骤：' + steps + ')<br>';
+                } else {
+                    progressDiv.innerHTML = '错误：' + data.message + '<br>';
                 }
             });
         }
@@ -295,7 +442,7 @@
             progressDiv.innerHTML += data.message + '<br>';
             progressDiv.scrollTop = progressDiv.scrollHeight;
             if (data.status === 'success') {
-                setTimeout(() => location.reload(), 1000);
+                setTimeout(() => updateFileList(), 1000);
             }
         });
 
@@ -318,6 +465,132 @@
                 }
             });
             document.querySelector('#downloadModal .btn-close').click();
+        };
+
+        function refreshStatus() {
+            updateFileList();
+        }
+
+        function renderFileTable(files) {
+            const tbody = document.getElementById('filesBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            files.forEach(file => {
+                const tr = document.createElement('tr');
+
+                const nameTd = document.createElement('td');
+                nameTd.className = 'col-name';
+                nameTd.textContent = file.name;
+
+                const timeTd = document.createElement('td');
+                timeTd.className = 'col-time';
+                timeTd.textContent = file.last_time || '未转写';
+
+                const actionsTd = document.createElement('td');
+
+                const group = document.createElement('div');
+                group.className = 'btn-group';
+                group.setAttribute('role', 'group');
+
+                const btn12 = document.createElement('button');
+                btn12.className = 'btn btn-outline-primary btn-sm me-2';
+                btn12.textContent = '只做转写';
+                btn12.addEventListener('click', () => startTranscribe(file.name, '12'));
+
+                const btn123 = document.createElement('button');
+                btn123.className = 'btn btn-outline-info btn-sm me-2';
+                btn123.textContent = '转后修补';
+                btn123.addEventListener('click', () => startTranscribe(file.name, '123'));
+
+                const btn1234 = document.createElement('button');
+                btn1234.className = 'btn btn-outline-primary btn-sm me-2';
+                btn1234.textContent = '转补总结';
+                btn1234.addEventListener('click', () => startTranscribe(file.name, '1234'));
+
+                const subGroup = document.createElement('div');
+                subGroup.className = 'btn-group ms-3';
+                subGroup.setAttribute('role', 'group');
+
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'btn btn-info btn-sm me-2';
+                viewBtn.innerHTML = '<i class="bi bi-eye"></i> 查看转写';
+                viewBtn.addEventListener('click', () => viewTranscription(file.name));
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'btn btn-outline-danger btn-sm';
+                delBtn.title = '删除文件';
+                delBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                delBtn.addEventListener('click', () => deleteFile(file.name));
+
+                subGroup.appendChild(viewBtn);
+                subGroup.appendChild(delBtn);
+
+                group.appendChild(btn12);
+                group.appendChild(btn123);
+                group.appendChild(btn1234);
+                group.appendChild(subGroup);
+
+                actionsTd.appendChild(group);
+
+                tr.appendChild(nameTd);
+                tr.appendChild(timeTd);
+                tr.appendChild(actionsTd);
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateFileList() {
+            fetch('/files')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        renderFileTable(data.files || []);
+                    }
+                });
+        }
+
+        // 本地上传
+        document.getElementById('uploadForm').onsubmit = function(e) {
+            e.preventDefault();
+            const files = document.getElementById('uploadFiles').files;
+            if (!files || files.length === 0) {
+                alert('请选择至少一个文件');
+                return;
+            }
+            const steps = document.getElementById('uploadSteps').value;
+            const autoStart = document.getElementById('uploadAutoStart').checked;
+
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+            formData.append('steps', steps);
+            formData.append('auto_start', autoStart ? '1' : '0');
+
+            progressDiv.innerHTML = '开始上传 ' + files.length + ' 个文件...<br>';
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    progressDiv.innerHTML += '上传成功：' + (data.saved || []).join(', ') + '<br>';
+                    if (data.queued && data.queued.length > 0) {
+                        progressDiv.innerHTML += '已加入任务队列：' + data.queued.join(', ') + '<br>';
+                    }
+                    if (data.errors && data.errors.length > 0) {
+                        data.errors.forEach(err => {
+                            progressDiv.innerHTML += '错误：' + err.file + ' - ' + err.message + '<br>';
+                        });
+                    }
+                    setTimeout(() => updateFileList(), 1000);
+                } else {
+                    progressDiv.innerHTML += '错误：' + data.message + '<br>';
+                }
+            });
+            document.querySelector('#uploadModal .btn-close').click();
         };
 
 
@@ -360,6 +633,7 @@
                         const item = document.createElement('div');
                         item.className = 'list-group-item d-flex justify-content-between align-items-center';
                         item.setAttribute('data-prompt', prompt);
+                        item.setAttribute('data-name', displayName.toLowerCase());
                         item.innerHTML = `
                             <span class="prompt-name">${displayName}</span>
                             <div class="btn-group">
@@ -369,6 +643,7 @@
                         `;
                         promptList.appendChild(item);
                     });
+                    filterPromptList();
                 });
         }
 
@@ -469,27 +744,54 @@
                     loadPromptList();
                 });
             }
+            const promptSearch = document.getElementById('promptSearch');
+            if (promptSearch) {
+                promptSearch.addEventListener('input', filterPromptList);
+            }
         });
+
+        function filterPromptList() {
+            const promptSearch = document.getElementById('promptSearch');
+            if (!promptSearch) return;
+            const keyword = promptSearch.value.trim().toLowerCase();
+            document.querySelectorAll('#promptList .list-group-item').forEach(item => {
+                const name = item.getAttribute('data-name') || '';
+                item.style.display = name.includes(keyword) ? '' : 'none';
+            });
+        }
     </script>
     <!-- Prompt管理模态框 -->
     <div class="modal fade" id="promptModal" tabindex="-1" aria-labelledby="promptModalLabel" data-bs-backdrop="static" data-bs-keyboard="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="promptModalLabel">Prompt管理</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="d-flex justify-content-between mb-3">
-                        <h6>Prompt列表</h6>
-                        <button type="button" class="btn btn-sm btn-success" onclick="createNewPrompt()">新建Prompt</button>
-                    </div>
-                    <div class="list-group mb-3" id="promptList">
-                        <!-- Prompt列表将通过JavaScript动态加载 -->
-                    </div>
-                    <div class="form-group">
-                        <label for="promptEditor" class="form-label">编辑区域</label>
-                        <textarea class="form-control" id="promptEditor" rows="10" style="font-family: monospace;"></textarea>
+                    <div class="prompt-shell">
+                        <div class="prompt-panel">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Prompt列表</h6>
+                                <button type="button" class="btn btn-sm btn-success" onclick="createNewPrompt()">新建</button>
+                            </div>
+                            <input type="text" class="form-control form-control-sm prompt-search" id="promptSearch" placeholder="搜索 Prompt">
+                            <div class="list-group" id="promptList">
+                                <!-- Prompt列表将通过JavaScript动态加载 -->
+                            </div>
+                        </div>
+                        <div class="prompt-editor-panel">
+                            <div class="prompt-editor-toolbar">
+                                <div>
+                                    <div class="fw-semibold">编辑区域</div>
+                                    <div class="hint">支持 Markdown 语法，建议注明输出格式</div>
+                                </div>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="savePrompt()">保存</button>
+                                </div>
+                            </div>
+                            <textarea class="form-control" id="promptEditor" rows="10" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"></textarea>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

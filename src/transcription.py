@@ -4,6 +4,7 @@ import logging
 import whisper
 import torch
 import config
+from .errors import Codes, format_message
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def transcribe_audio(audio_path, prompt):
         # 将相对路径转换为绝对路径，并检查文件是否存在
         audio_path = os.path.abspath(audio_path)
         if not os.path.exists(audio_path):
-            logger.error(f"输入文件不存在: {audio_path}")
+            logger.error(format_message(Codes.INPUT_NOT_FOUND, f"输入文件不存在: {audio_path}"))
             return None
 
         logger.info(f"开始音频转写，输入文件路径: {audio_path}")
@@ -68,7 +69,7 @@ def transcribe_audio(audio_path, prompt):
 
         # 构造输出文件名（与输入文件同目录，文件名添加 _transcribed 后缀）
         base_name = os.path.splitext(os.path.basename(audio_path))[0]
-        output_file = os.path.join(os.path.dirname(audio_path), f"{base_name}_转写.txt")
+        output_file = os.path.join(os.path.dirname(audio_path), f"{base_name}_转写.md")
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(transcription_text)
 
@@ -77,5 +78,5 @@ def transcribe_audio(audio_path, prompt):
         return output_file
 
     except Exception as e:
-        logger.error(f"执行音频转写时发生错误: {e}")
+        logger.error(format_message(Codes.TRANSCRIBE_FAIL, "执行音频转写时发生错误", str(e)))
         return None

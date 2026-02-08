@@ -2,15 +2,17 @@ import os
 import logging
 import ffmpeg
 import imageio_ffmpeg
+from .errors import Codes, format_message
 
 logger = logging.getLogger(__name__)
 
-def preprocess_video(video_path):
+def preprocess_video(video_path, output_dir=None):
     """
     视频预处理，将视频转换为音频
 
     Args:
         video_path (str): 视频文件路径
+        output_dir (str): 输出目录（可选）
 
     Returns:
         str: 生成的音频文件路径，如果处理失败则返回 None
@@ -19,12 +21,17 @@ def preprocess_video(video_path):
         logger.debug(f'开始视频预处理，输入文件路径: {video_path}')
         # 检查输入文件是否存在
         if not os.path.exists(video_path):
-            logger.error(f'输入文件不存在: {video_path}')
+            logger.error(format_message(Codes.INPUT_NOT_FOUND, f'输入文件不存在: {video_path}'))
             return None
 
         # 构建输出文件路径，使用 m4a 容器
-        base, _ = os.path.splitext(video_path)
-        output_path = f"{base}_音频.m4a"
+        base_name = os.path.splitext(os.path.basename(video_path))[0]
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, f"{base_name}_音频.m4a")
+        else:
+            base, _ = os.path.splitext(video_path)
+            output_path = f"{base}_音频.m4a"
 
         # 构造 ffmpeg 处理链
         # 使用 stream.audio 来仅保留音频流，并禁用视频（vn）
@@ -54,6 +61,5 @@ def preprocess_video(video_path):
         return output_path
 
     except Exception as e:
-        logger.error(f'视频预处理过程出错: {e}')
+        logger.error(format_message(Codes.PREPROCESS_FAIL, '视频预处理过程出错', str(e)))
         return None
-

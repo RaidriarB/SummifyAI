@@ -17,12 +17,14 @@ env/
 # IDE
 .vscode/
 .idea/
+.codex/
 
 # Project specific
 output/
 tempdata/
 web/data/
 web/tempdata/
+logs/
 
 # System files
 .DS_Store

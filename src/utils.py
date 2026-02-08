@@ -2,6 +2,7 @@ import os
 import logging
 import shutil
 import re
+from .errors import Codes, format_message
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def save_text_to_file(text, output_path):
         logger.debug(f'文本保存完成，文件路径: {output_path}')
         return True
     except Exception as e:
-        logger.error(f'保存文本到文件时出错: {e}')
+        logger.error(format_message(Codes.FILE_IO, '保存文本到文件时出错', str(e)))
         return None
 
 def copy_file(src_path, dst_path):
@@ -47,7 +48,7 @@ def copy_file(src_path, dst_path):
         logger.debug(f'文件复制完成，目标路径: {dst_path}')
         return True
     except Exception as e:
-        logger.error(f'复制文件时出错: {e}')
+        logger.error(format_message(Codes.FILE_IO, '复制文件时出错', str(e)))
         return None
 
 def move_file(src_path, dst_path):
@@ -69,7 +70,7 @@ def move_file(src_path, dst_path):
         logger.debug(f'文件移动完成，目标路径: {dst_path}')
         return True
     except Exception as e:
-        logger.error(f'移动文件时出错: {e}')
+        logger.error(format_message(Codes.FILE_IO, '移动文件时出错', str(e)))
         return None
 
 

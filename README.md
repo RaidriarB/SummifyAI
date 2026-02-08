@@ -24,6 +24,12 @@ SummifyAI 能将音频或视频快速转写为文字，并通过自定义 prompt
 - 调用 AI 智能添文本修正润色和修正文本，大幅提高准确性（可选用超便宜的deepseek！）
 - 可自定义prompt，进行生成文本摘要和关键信息提取等一系列操作
 - 分步骤处理，可灵活选择执行的功能
+- Web端支持本地文件批量上传并建立任务
+- Web端任务队列，避免并发资源占用
+- 转写/总结输出统一为 Markdown（.md），并支持 Mermaid 渲染
+- 转写结果支持在线查看与编辑保存
+- 日志输出到 `logs/` 目录（可通过环境变量调整）
+- Web端“刷新”按钮支持仅刷新状态
 
 <img src="./imgs/web1.png" style="zoom:50%;" />
 <img src="./imgs/web2.png" style="zoom:50%;" />
@@ -47,7 +53,7 @@ pip install -r requirements.txt
 ```
 
 安装后配置：
-- 在config.py中，配置apikey
+- 在 `.env` 或环境变量中配置 `API_KEY`（也可直接修改 `config.py`）
 - prompts文件夹中，可编写多个txt文件，作为自定义的prompt，工具会分别处理。
 - 其他高级配置可以暂时不用动
 - **注意：首次使用需要下载whisper库的模型文件，模型文件大小从几十MB、几百MB到1.5GB左右不等**
@@ -101,9 +107,10 @@ optional arguments:
                                               
   -o OUTPUT_DIR, --output-dir OUTPUT_DIR
                         
-                        输出目录，用于存放处理结果（默认：output）
-                        每个步骤的结果将保存在该目录下
+    输出目录，用于存放处理结果（默认：output）
+    每个步骤的结果将保存在该目录下
 ```
+提示：转写/修正/总结输出文件为 `.md` 格式。
 ## 3 常见问题
 
 
@@ -133,6 +140,7 @@ export HTTPS_PROXY=http://127.0.0.1:7897
 ## 其他
 
 更新日志：
+- 2026-02-08 Web端批量上传、任务队列、在线编辑、输出改为 Markdown
 - 2025-03-24 增加web界面，同时支持爬取bilibili和小宇宙的音视频
 - 2025-03-22 直接使用whisper库，无需再下载buzz
 - 2025-03-21 代码模块化、参数变量化、添加openai支持

@@ -5,11 +5,16 @@ import os
 load_dotenv()
 
 # API配置
-# API密钥
-API_KEY = os.getenv('API_KEY', 'sk-a02af37b9800413db3324d34f01f291f')
+# API密钥（建议通过环境变量或 .env 文件配置）
+API_KEY = os.getenv('API_KEY', '')
 
-# API类型，可选值：'deepseek'或'claude'
-API_TYPE = os.getenv('API_TYPE', 'deepseek')
+# API类型，可选值：'deepseek'、'claude'或'openai'
+API_TYPE = os.getenv('API_TYPE', 'deepseek').lower()
+
+# 可选：模型名称覆盖
+DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o')
+CLAUDE_MODEL = os.getenv('CLAUDE_MODEL', 'claude-3.5-Sonnet')
 
 ''' 选择用于语音转写的模型大小（初次需要下载）
 - tiny 75MB
@@ -33,6 +38,14 @@ CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', '4000'))
 MODEL_TEMPERATURE = float(os.getenv('MODEL_TEMPERATURE', '0.9'))
 MODEL_MAX_TOKENS = int(os.getenv('MODEL_MAX_TOKENS', '8000'))
 AI_THREADS = int(os.getenv('AI_THREADS', '4'))
+AI_RETRY_MAX = int(os.getenv('AI_RETRY_MAX', '2'))
+AI_RETRY_BACKOFF_SECONDS = float(os.getenv('AI_RETRY_BACKOFF_SECONDS', '1.0'))
+
+# 日志配置
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+LOG_DIR = os.getenv('LOG_DIR', 'logs')
+LOG_MAX_BYTES = int(os.getenv('LOG_MAX_BYTES', '5000000'))
+LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', '3'))
 
 
 '''选用的语音转写模型

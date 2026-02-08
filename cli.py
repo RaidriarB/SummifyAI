@@ -3,21 +3,35 @@ import argparse
 import os
 import logging
 
+from src.logging_config import setup_logging
+from src.errors import Codes, format_message
 from src.video_processor import preprocess_video
 from src.transcription import transcribe_audio
 from src.text_processor import add_punctuation, process_with_prompts
 from src.utils import save_text_to_file, move_file, copy_file
-from src.ai_service import call_ai_api
 
 import config
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-VERSION = 'v1.3.0'
+VERSION = 'v1.3.1'
 AUTHOR = 'RaidriarB'
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+VIDEO_EXTS = {'.mp4', '.avi', '.mkv', '.mov', '.flv', '.webm', '.m4v'}
+AUDIO_EXTS = {'.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg'}
+TEXT_EXTS = {'.txt'}
+
+def detect_input_kind(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext in TEXT_EXTS:
+        return 'text'
+    if ext in AUDIO_EXTS:
+        return 'audio'
+    if ext in VIDEO_EXTS:
+        return 'video'
+    return 'unknown'
 
 def parse_steps(steps_str):
     """
@@ -29,9 +43,19 @@ def parse_steps(steps_str):
     Returns:
         list: 要执行的步骤列表
     """
-    valid_steps = set('01234')
-    steps = [int(s) for s in steps_str if s in valid_steps]
-    return sorted(list(dict.fromkeys(steps)))  # 去重并保持顺序
+    valid_steps = set('1234')
+    if not steps_str:
+        raise ValueError('steps 不能为空')
+    if any(s not in valid_steps for s in steps_str):
+        raise ValueError('steps 只支持 1-4 的组合，例如 "12"、"234"')
+    steps = []
+    for s in steps_str:
+        step = int(s)
+        if step not in steps:
+            steps.append(step)
+    if steps != sorted(steps):
+        raise ValueError('steps 必须按顺序执行，例如 "12"、"234"')
+    return steps
 
 def print_banner():
     banner = f"""
@@ -47,7 +71,14 @@ def print_banner():
     print(banner)
 
 def main():
-    
+    setup_logging(
+        app_name="cli",
+        log_dir=os.path.join(BASE_DIR, config.LOG_DIR),
+        level=config.LOG_LEVEL,
+        max_bytes=config.LOG_MAX_BYTES,
+        backup_count=config.LOG_BACKUP_COUNT,
+    )
+
     parser = argparse.ArgumentParser(
         description='''
     音频处理工具 - 将音视频内容转换为文字并进行智能总结
@@ -68,6 +99,7 @@ def main():
     formatter_class=argparse.RawTextHelpFormatter  # 保留换行
     )
     parser.add_argument('-i','--input', 
+                      required=True,
                       help='''
 输入文件路径。支持的格式：
 - 视频文件：mp4, avi, mkv等
@@ -108,44 +140,71 @@ def main():
 
     if not args.nobanner: print_banner()
     
+    # 检查输入参数
+    if not args.input:
+        logger.error(format_message(Codes.INVALID_ARGS, '未提供输入文件'))
+        return
+
     # 确保输入文件存在
     if not os.path.exists(args.input):
-        logger.error(f'输入文件不存在: {args.input}')
+        logger.error(format_message(Codes.INPUT_NOT_FOUND, f'输入文件不存在: {args.input}'))
         return
     
     # 确保输出目录存在
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    os.makedirs(args.output_dir, exist_ok=True)
     
     # 解析要执行的步骤
-    steps = parse_steps(args.steps)
+    try:
+        steps = parse_steps(args.steps)
+    except ValueError as e:
+        logger.error(format_message(Codes.INVALID_ARGS, str(e)))
+        return
     logger.info(f'将执行以下步骤: {steps}')
     
     current_file = args.input
     base_name = os.path.splitext(os.path.basename(args.input))[0]
+    input_kind = detect_input_kind(args.input)
+
+    # 校验步骤与输入类型的匹配关系
+    if input_kind == 'unknown':
+        logger.error(format_message(Codes.UNSUPPORTED_INPUT, '无法识别的输入文件类型'))
+        return
+    if 1 in steps and input_kind == 'text':
+        logger.error(format_message(Codes.STEP_MISMATCH, '步骤1不支持文本输入，请提供音频或视频文件'))
+        return
+    if 2 in steps and input_kind == 'text':
+        logger.error(format_message(Codes.STEP_MISMATCH, '步骤2需要音频输入，请先执行步骤1或提供音频文件'))
+        return
+    if 2 in steps and input_kind == 'video' and 1 not in steps:
+        logger.error(format_message(Codes.STEP_MISMATCH, '输入为视频时需要先执行步骤1'))
+        return
+    if any(s in steps for s in [3, 4]) and 2 not in steps and input_kind != 'text':
+        logger.error(format_message(Codes.STEP_MISMATCH, '步骤3/4需要文本输入，请先执行步骤2或提供txt文件'))
+        return
     
     try:
 
         # 步骤1：音频预处理
         if 1 in steps:
             logger.info('步骤1：开始音频预处理')
-            processed_audio = preprocess_video(current_file)
+            processed_audio = preprocess_video(current_file, output_dir=os.path.join(config.TEMP_DIR, '1'))
             if not processed_audio:
-                logger.error('音频预处理失败')
+                logger.error(format_message(Codes.PREPROCESS_FAIL, '音频预处理失败'))
                 return
             current_file = processed_audio
-            # 移动到data/1目录
+            # 移动到data/1目录（如已在目标目录则跳过）
             data_file = os.path.join(config.TEMP_DIR, '1', os.path.basename(current_file))
-            if not move_file(current_file, data_file):
-                logger.error('移动预处理结果失败')
-                return
-            current_file = data_file
+            if os.path.abspath(current_file) != os.path.abspath(data_file):
+                if not move_file(current_file, data_file):
+                    logger.error(format_message(Codes.FILE_IO, '移动预处理结果失败'))
+                    return
+                current_file = data_file
             
             # 如果步骤1是最后一步，将结果复制到output目录
             if steps[-1] == 1:
                 output_file = os.path.join(args.output_dir, os.path.basename(current_file))
                 if not copy_file(current_file, output_file):
-                    logger.error('复制预处理结果到output目录失败')
+                    logger.error(format_message(Codes.FILE_IO, '复制预处理结果到output目录失败'))
                     return
         
         # 步骤2：语音转写
@@ -154,14 +213,14 @@ def main():
             prompt = '将以下音频转写成中文文本,确保使用正确的标点符号。'
             transcribed_file = transcribe_audio(current_file, prompt)
             if not transcribed_file:
-                logger.error('语音转写失败')
+                logger.error(format_message(Codes.TRANSCRIBE_FAIL, '语音转写失败'))
                 return
             
             current_file = os.path.join(os.path.dirname(current_file), transcribed_file)
             # 移动到data/2目录
             data_file = os.path.join(config.TEMP_DIR, '2', os.path.basename(current_file))
             if not move_file(current_file, data_file):
-                logger.error('移动转写结果失败')
+                logger.error(format_message(Codes.FILE_IO, '移动转写结果失败'))
                 return
             current_file = data_file
             
@@ -169,7 +228,7 @@ def main():
             if steps[-1] == 2:
                 output_file = os.path.join(args.output_dir, os.path.basename(current_file))
                 if not copy_file(current_file, output_file):
-                    logger.error('复制转写结果到output目录失败')
+                    logger.error(format_message(Codes.FILE_IO, '复制转写结果到output目录失败'))
                     return
         
         # 步骤3：AI文本修正润色
@@ -177,7 +236,7 @@ def main():
             logger.info('步骤3：开始AI文本修正润色')
             api_key = config.API_KEY
             if not api_key:
-                logger.error('未配置API密钥')
+                logger.error(format_message(Codes.AI_KEY_MISSING, '未配置API密钥'))
                 return
             
             with open(current_file, 'r', encoding='utf-8') as f:
@@ -198,22 +257,22 @@ def main():
             )
             
             if punctuated_text:
-                punctuated_file = os.path.join(args.output_dir, f'{base_name}_fixed.txt')
+                punctuated_file = os.path.join(args.output_dir, f'{base_name}_fixed.md')
                 if save_text_to_file(punctuated_text, punctuated_file):
                     current_file = punctuated_file
                     # 保存到data/3目录
                     data_file = os.path.join(config.TEMP_DIR, '3', os.path.basename(current_file))
                     if not copy_file(current_file, data_file):
-                        logger.error('保存文本修正润色结果失败')
+                        logger.error(format_message(Codes.FILE_IO, '保存文本修正润色结果失败'))
                         return
                     
                     # 如果步骤3是最后一步，将结果复制到output目录?
                     # 无需这样做，因为步骤3的结果已经被输出到output目录
                 else:
-                    logger.error('保存文本修正润色文本失败')
+                    logger.error(format_message(Codes.FILE_IO, '保存文本修正润色文本失败'))
                     return
             else:
-                logger.error('AI文本修正润色失败')
+                logger.error(format_message(Codes.AI_CALL_FAIL, 'AI文本修正润色失败'))
                 return
         
         # 步骤4：AI总结
@@ -221,20 +280,20 @@ def main():
             logger.info('步骤4：开始AI总结')
             api_key = config.API_KEY
             if not api_key:
-                logger.error('未配置API密钥')
+                logger.error(format_message(Codes.AI_KEY_MISSING, '未配置API密钥'))
                 return
             
             with open(current_file, 'r', encoding='utf-8') as f:
                 text = f.read()
             
             if not process_with_prompts(text, api_key, config.API_TYPE, args.prompts_dir, args.output_dir):
-                logger.error('AI总结失败')
+                logger.error(format_message(Codes.AI_CALL_FAIL, 'AI总结失败'))
                 return
         
         logger.info('所有步骤处理完成')
         
     except Exception as e:
-        logger.error(f'处理过程出错: {e}')
+        logger.error(format_message(Codes.INTERNAL, '处理过程出错', str(e)))
 
 if __name__ == '__main__':
     main()

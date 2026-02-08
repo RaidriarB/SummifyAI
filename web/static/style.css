@@ -1,15 +1,16 @@
 /* 通用按钮样式优化 */
 .btn {
     border-radius: 8px;
-    padding: 8px 16px;
+    padding: 6px 12px;
     font-weight: 500;
+    font-size: 0.85rem;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn:hover,
 .btn:focus {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
 }
 
@@ -73,7 +74,7 @@
 
     .btn-group .btn {
         flex: 1 1 auto;
-        padding: 8px;
+        padding: 6px 10px;
     }
 }
 
@@ -85,6 +86,6 @@
 
     .btn-group .btn {
         white-space: nowrap;
-        padding: 8px 12px;
+        padding: 6px 10px;
     }
 }
