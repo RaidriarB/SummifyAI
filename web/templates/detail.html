@@ -21,16 +21,17 @@
 </script>
     <style>
         :root {
-            --primary-color: #0d6efd;
-            --success-color: #198754;
-            --danger-color: #dc3545;
-            --info-color: #0dcaf0;
-            --border-color: #dee2e6;
-            --shadow-color: rgba(0, 0, 0, 0.1);
+            --primary-color: #0f766e;
+            --success-color: #2f8f6d;
+            --danger-color: #c2410c;
+            --info-color: #2a9d8f;
+            --border-color: #e7e0d7;
+            --shadow-color: rgba(20, 14, 10, 0.12);
+            --shadow-md: 0 10px 24px rgba(20, 14, 10, 0.12);
             --surface: #ffffff;
-            --surface-alt: #f6f8fb;
-            --text-strong: #1f2937;
-            --text-muted: #6b7280;
+            --surface-alt: #fbf8f4;
+            --text-strong: #1f1a16;
+            --text-muted: #6f6258;
         }
         body {
             user-select: none;
@@ -46,7 +47,7 @@
         }
         .section-title {
             margin: 16px 0 12px;
-            color: #333;
+            color: var(--text-strong);
             font-weight: 600;
         }
         .detail-shell {
@@ -64,7 +65,7 @@
             background: var(--surface);
             border: 1px solid var(--border-color);
             border-radius: 14px;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+            box-shadow: var(--shadow-md);
             overflow: hidden;
         }
         .panel-header {
@@ -92,7 +93,7 @@
             border: 1px solid transparent;
             border-radius: 10px;
             margin-bottom: 10px;
-            background: #fff;
+            background: var(--surface);
             transition: all 0.15s ease-in-out;
             display: flex;
             flex-direction: column;
@@ -100,13 +101,13 @@
             gap: 10px;
         }
         .list-group-item:hover {
-            border-color: #dbe3ef;
+            border-color: #e5ddd3;
             transform: translateY(-1px);
             box-shadow: 0 6px 12px rgba(15, 23, 42, 0.08);
         }
         .list-group-item.active {
-            border-color: #b6d4fe;
-            background: #eef4ff;
+            border-color: #e3d7ca;
+            background: #f3eee6;
         }
         .file-name {
             font-weight: 600;
@@ -122,10 +123,10 @@
             max-height: 70vh;
             overflow-y: auto;
             padding: 16px 18px;
-            background: #fff;
+            background: var(--surface);
         }
         .media-preview {
-            background: #0f172a;
+            background: #1a1713;
             border-radius: 12px;
             padding: 10px;
             color: #e2e8f0;
@@ -147,7 +148,7 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             font-size: 0.9rem;
             line-height: 1.5;
-            background: #fff;
+            background: var(--surface);
         }
         .preview-toolbar {
             display: flex;
@@ -165,14 +166,14 @@
             margin-top: 1.2em;
         }
         .markdown-body pre {
-            background: #0b1020;
-            color: #e5e7eb;
+            background: #1f1b16;
+            color: #e7e2d9;
             padding: 12px 14px;
             border-radius: 8px;
             overflow: auto;
         }
         .markdown-body code {
-            background: #f2f4f8;
+            background: #f4efe7;
             padding: 2px 6px;
             border-radius: 6px;
         }
@@ -232,7 +233,7 @@
 
     <div class="container-fluid px-3 mt-3">
         <div class="d-flex justify-content-between align-items-center">
-            <h2 class="section-title mb-0">{{ filename }} 的转写结果</h2>
+            <h2 class="section-title mb-0">{{ display_name }} 的转写结果</h2>
             <a href="/" class="btn btn-outline-primary" style="white-space: nowrap">返回文件列表</a>
         </div>
 
@@ -251,7 +252,7 @@
                             <div class="action-row">
                                 <div class="btn-group">
                                     <button class="btn btn-sm btn-primary view-btn" data-file="{{ file.name }}" style="white-space: nowrap; min-width: 60px;">查看</button>
-                                    <a href="/download_file/{{ filename.split('.')[0] }}/{{ file.name }}" class="btn btn-sm btn-success" style="white-space: nowrap; min-width: 60px;">下载</a>
+                                    <a href="/download_file/{{ folder_name }}/{{ file.name }}" class="btn btn-sm btn-success" style="white-space: nowrap; min-width: 60px;">下载</a>
                                     <button class="btn btn-sm btn-danger delete-btn" data-file="{{ file.name }}" style="white-space: nowrap; min-width: 60px;">删除</button>
                                 </div>
                             </div>
@@ -306,6 +307,7 @@
             let dirty = false;
             let originalContent = {{ content|tojson }};
             let currentFile = {{ (default_file or '')|tojson }};
+            const folderName = {{ (folder_name or '')|tojson }};
             const toggleBtn = document.getElementById('toggle-view');
             const currentFileEl = document.getElementById('current-file');
             const previewDiv = document.getElementById('markdown-preview');
@@ -400,7 +402,6 @@
 
             saveEdit.addEventListener('click', () => {
                 if (!currentFile) return;
-                const folderName = '{{ filename }}'.split('.')[0];
                 const content = editor.value || '';
                 fetch(`/save_output_file/${folderName}/${currentFile}`, {
                     method: 'POST',
@@ -436,7 +437,6 @@
                         if (!ok) return;
                     }
                     const fileName = this.dataset.file;
-                    const folderName = '{{ filename }}'.split('.')[0];
                     fetch(`/view_file/${folderName}/${fileName}`)
                         .then(response => response.text())
                         .then(content => {
@@ -463,7 +463,6 @@
                 btn.addEventListener('click', function() {
                     if (confirm('确定要删除这个文件吗？')) {
                         const fileName = this.dataset.file;
-                        const folderName = '{{ filename }}'.split('.')[0];
                         const url = `/delete_file_in_output/${folderName}/${fileName}`;
                         console.log('[DEBUG] 删除文件请求URL:', url);
                         fetch(url, { method: 'POST' })

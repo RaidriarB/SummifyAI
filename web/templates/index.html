@@ -10,12 +10,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         :root {
-            --primary-color: #0d6efd;
-            --success-color: #198754;
-            --danger-color: #dc3545;
-            --info-color: #0dcaf0;
-            --border-color: #dee2e6;
-            --shadow-color: rgba(0, 0, 0, 0.1);
+            --primary-color: #0f766e;
+            --success-color: #2f8f6d;
+            --danger-color: #c2410c;
+            --info-color: #2a9d8f;
+            --border-color: #e7e0d7;
+            --shadow-color: rgba(20, 14, 10, 0.12);
+            --surface: #ffffff;
+            --surface-alt: #fbf8f4;
+            --text-strong: #1f1a16;
+            --text-muted: #6f6258;
         }
         .progress-container {
             height: 300px;
@@ -24,24 +28,24 @@
             border-radius: 8px;
             padding: 15px;
             margin-top: 20px;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
+            background: linear-gradient(180deg, #1f1b16 0%, #14110f 100%);
+            color: #e7e2d9;
             font-family: 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.5;
             white-space: pre-wrap;
-            box-shadow: 0 2px 4px var(--shadow-color);
+            box-shadow: 0 8px 20px var(--shadow-color);
         }
         .progress-container::before {
             content: '> ';
-            color: #569cd6;
+            color: #9dd6cf;
         }
         .progress-container::after {
             content: '';
             display: inline-block;
             width: 10px;
             height: 20px;
-            background-color: #d4d4d4;
+            background-color: #e7e2d9;
             animation: blink 1s steps(2, start) infinite;
         }
         @keyframes blink {
@@ -60,8 +64,8 @@
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 15px;
-            box-shadow: 0 2px 4px var(--shadow-color);
-            background-color: #fff;
+            box-shadow: 0 8px 20px var(--shadow-color);
+            background-color: var(--surface);
         }
         .table-fixed {
             table-layout: auto;
@@ -71,10 +75,10 @@
             width: 52%;
             word-break: break-all;
             font-weight: 600;
-            color: #1f2937;
+            color: var(--text-strong);
         }
         .table tbody .col-name {
-            background: #f5f7fa;
+            background: #f7f2ec;
         }
         .col-time {
             width: 180px;
@@ -102,7 +106,7 @@
             margin-bottom: 0;
         }
         .table thead th {
-            background-color: #f8f9fa;
+            background-color: var(--surface-alt);
             border-bottom: 2px solid var(--border-color);
             padding: 12px;
             font-weight: 600;
@@ -112,7 +116,7 @@
             vertical-align: middle;
         }
         .table tr:hover {
-            background-color: #f8f9fa;
+            background-color: #f7f2ec;
         }
         @media (max-width: 768px) {
             .table-responsive {
@@ -131,8 +135,7 @@
                 gap: 10px;
             }
             .page-toolbar {
-                flex-direction: column-reverse;
-                align-items: stretch;
+                grid-template-columns: 1fr;
             }
             .page-toolbar .toolbar-right {
                 justify-content: flex-start;
@@ -180,7 +183,7 @@
         }
         .section-title {
             margin: 30px 0 20px;
-            color: #333;
+            color: var(--text-strong);
         }
         .section-header {
             display: flex;
@@ -189,24 +192,23 @@
             margin-bottom: 20px;
         }
         .page-toolbar {
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(520px, 1fr) 360px;
             gap: 16px;
-            align-items: flex-start;
-            justify-content: space-between;
+            align-items: stretch;
             margin-bottom: 16px;
         }
         .page-toolbar .toolbar-left {
-            flex: 1 1 auto;
             min-width: 320px;
         }
         .page-toolbar .toolbar-right {
             display: flex;
-            justify-content: flex-end;
             align-items: stretch;
             min-width: 320px;
         }
         .toolbar-card {
             width: 100%;
+            height: 100%;
         }
         .toolbar-actions {
             display: grid;
@@ -215,6 +217,42 @@
         }
         .toolbar-actions .btn {
             width: 100%;
+        }
+        .file-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 8px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            border: 1px solid transparent;
+        }
+        .file-badge--done {
+            background: rgba(15, 118, 110, 0.12);
+            color: #0f766e;
+            border-color: rgba(15, 118, 110, 0.2);
+        }
+        .file-badge--pending {
+            background: rgba(124, 103, 82, 0.12);
+            color: #7a6a5a;
+            border-color: rgba(124, 103, 82, 0.2);
+        }
+        .log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 22px;
+            margin-bottom: 8px;
+        }
+        .log-title {
+            font-weight: 600;
+            color: var(--text-strong);
+        }
+        .log-actions .btn {
+            box-shadow: none;
         }
         .list-group-item {
             border: 1px solid var(--border-color);
@@ -331,7 +369,7 @@
     <div class="container mt-4">
         <div class="page-toolbar">
             <div class="toolbar-left">
-                <div class="card shadow-sm">
+                <div class="card shadow-sm toolbar-card">
                     <div class="card-body">
                         <div class="row g-3 align-items-end">
                             <div class="col-md-4 col-lg-3">
@@ -464,18 +502,29 @@
                 <tbody id="filesBody">
                     {% for file in files %}
                     <tr>
-                        <td class="col-name">{{ file.name }}</td>
+                        <td class="col-name">
+                            <span class="file-name-text">{{ file.name }}</span>
+                            {% if file.status == '已总结' %}
+                            <span class="file-badge file-badge--done">已总结</span>
+                            {% elif file.status == '已修补' %}
+                            <span class="file-badge file-badge--done">已修补</span>
+                            {% elif file.status == '已转写' %}
+                            <span class="file-badge file-badge--done">已转写</span>
+                            {% else %}
+                            <span class="file-badge file-badge--pending">未转写</span>
+                            {% endif %}
+                        </td>
                         <td class="col-time">{{ file.last_time }}</td>
                         <td>
                             <div class="btn-group" role="group">
-                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '12')">只做转写</button>
-                                <button class="btn btn-outline-info btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '123')">转后修补</button>
-                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.name }}', '1234')">转补总结</button>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.id }}', '{{ file.name }}', '12')">只做转写</button>
+                                <button class="btn btn-outline-info btn-sm me-2" onclick="startTranscribe('{{ file.id }}', '{{ file.name }}', '123')">转后修补</button>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="startTranscribe('{{ file.id }}', '{{ file.name }}', '1234')">转补总结</button>
                                 <div class="btn-group ms-3" role="group">
-                                    <button class="btn btn-info btn-sm me-2" onclick="viewTranscription('{{ file.name }}')">
+                                    <button class="btn btn-info btn-sm me-2" onclick="viewTranscription('{{ file.id }}')">
                                         <i class="bi bi-eye"></i> 查看转写
                                     </button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="deleteFile('{{ file.name }}')" title="删除文件">
+                                    <button class="btn btn-outline-danger btn-sm" onclick="deleteFile('{{ file.id }}', '{{ file.name }}')" title="删除文件">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
@@ -488,6 +537,12 @@
         </div>
 
         <!-- 转写进度显示 -->
+        <div class="log-header">
+            <div class="log-title">转写日志</div>
+            <div class="log-actions">
+                <button class="btn btn-outline-secondary btn-sm" id="clearLog">清空</button>
+            </div>
+        </div>
         <div id="progress" class="progress-container"></div>
     </div>
 
@@ -572,11 +627,11 @@
         });
 
         // 开始转写
-        function startTranscribe(filename, steps) {
+        function startTranscribe(fileId, displayName, steps) {
             progressDiv.innerHTML = ''; // 清空之前的输出
             const modelConfig = getSelectedModelConfig();
             const params = new URLSearchParams();
-            params.set('filename', filename);
+            params.set('filename', fileId);
             params.set('steps', steps);
             if (modelConfig.type) params.set('model_type', modelConfig.type);
             if (modelConfig.size) params.set('model_size', modelConfig.size);
@@ -590,7 +645,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    progressDiv.innerHTML = '已加入任务队列：' + filename + ' (步骤：' + steps + ')<br>';
+                    progressDiv.innerHTML = '已加入任务队列：' + (displayName || fileId) + ' (步骤：' + steps + ')<br>';
                 } else {
                     progressDiv.innerHTML = '错误：' + data.message + '<br>';
                 }
@@ -640,7 +695,15 @@
 
                 const nameTd = document.createElement('td');
                 nameTd.className = 'col-name';
-                nameTd.textContent = file.name;
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'file-name-text';
+                nameSpan.textContent = file.name;
+                const badge = document.createElement('span');
+                const status = file.status || (file.transcribed ? '已转写' : '未转写');
+                badge.className = 'file-badge ' + (status === '未转写' ? 'file-badge--pending' : 'file-badge--done');
+                badge.textContent = status;
+                nameTd.appendChild(nameSpan);
+                nameTd.appendChild(badge);
 
                 const timeTd = document.createElement('td');
                 timeTd.className = 'col-time';
@@ -655,17 +718,17 @@
                 const btn12 = document.createElement('button');
                 btn12.className = 'btn btn-outline-primary btn-sm me-2';
                 btn12.textContent = '只做转写';
-                btn12.addEventListener('click', () => startTranscribe(file.name, '12'));
+                btn12.addEventListener('click', () => startTranscribe(file.id || file.name, file.name, '12'));
 
                 const btn123 = document.createElement('button');
                 btn123.className = 'btn btn-outline-info btn-sm me-2';
                 btn123.textContent = '转后修补';
-                btn123.addEventListener('click', () => startTranscribe(file.name, '123'));
+                btn123.addEventListener('click', () => startTranscribe(file.id || file.name, file.name, '123'));
 
                 const btn1234 = document.createElement('button');
                 btn1234.className = 'btn btn-outline-primary btn-sm me-2';
                 btn1234.textContent = '转补总结';
-                btn1234.addEventListener('click', () => startTranscribe(file.name, '1234'));
+                btn1234.addEventListener('click', () => startTranscribe(file.id || file.name, file.name, '1234'));
 
                 const subGroup = document.createElement('div');
                 subGroup.className = 'btn-group ms-3';
@@ -674,13 +737,13 @@
                 const viewBtn = document.createElement('button');
                 viewBtn.className = 'btn btn-info btn-sm me-2';
                 viewBtn.innerHTML = '<i class="bi bi-eye"></i> 查看转写';
-                viewBtn.addEventListener('click', () => viewTranscription(file.name));
+                viewBtn.addEventListener('click', () => viewTranscription(file.id || file.name));
 
                 const delBtn = document.createElement('button');
                 delBtn.className = 'btn btn-outline-danger btn-sm';
                 delBtn.title = '删除文件';
                 delBtn.innerHTML = '<i class="bi bi-trash"></i>';
-                delBtn.addEventListener('click', () => deleteFile(file.name));
+                delBtn.addEventListener('click', () => deleteFile(file.id || file.name, file.name));
 
                 subGroup.appendChild(viewBtn);
                 subGroup.appendChild(delBtn);
@@ -759,18 +822,17 @@
 
 
         // 查看转写结果
-        function viewTranscription(filename) {
-            // 移除文件扩展名
-            const baseFilename = filename.split('.').slice(0, -1).join('.');
-            window.location.href = '/transcribe/' + encodeURIComponent(baseFilename);
+        function viewTranscription(fileId) {
+            window.location.href = '/transcribe/' + encodeURIComponent(fileId);
         }
 
         // 删除文件
-        function deleteFile(filename) {
-            if (!confirm('确定要删除文件 ' + filename + ' 吗？')) {
+        function deleteFile(fileId, displayName) {
+            const nameForConfirm = displayName || fileId;
+            if (!confirm('确定要删除文件 ' + nameForConfirm + ' 吗？')) {
                 return;
             }
-            fetch('/delete_all_file/' + encodeURIComponent(filename), {
+            fetch('/delete_all_file/' + encodeURIComponent(fileId), {
                 method: 'POST'
             })
             .then(response => response.json())
@@ -914,6 +976,12 @@
             }
             if (!initTooltips()) {
                 window.addEventListener('load', initTooltips);
+            }
+            const clearLogBtn = document.getElementById('clearLog');
+            if (clearLogBtn && progressDiv) {
+                clearLogBtn.addEventListener('click', () => {
+                    progressDiv.innerHTML = '';
+                });
             }
             const promptModal = document.getElementById('promptModal');
             if (promptModal) {

@@ -1,11 +1,97 @@
+:root {
+    --bg: #f5f2ee;
+    --bg-alt: #f0ebe5;
+    --surface: #ffffff;
+    --surface-alt: #fbf8f4;
+    --border-color: #e7e0d7;
+    --shadow-color: rgba(20, 14, 10, 0.12);
+    --shadow-sm: 0 1px 2px rgba(20, 14, 10, 0.06);
+    --shadow-md: 0 10px 24px rgba(20, 14, 10, 0.12);
+    --primary-color: #0f766e;
+    --primary-dark: #0b5f59;
+    --success-color: #2f8f6d;
+    --info-color: #2a9d8f;
+    --danger-color: #c2410c;
+    --text-color: #1f1a16;
+    --text-muted: #6f6258;
+    --accent-color: #c59d5f;
+    --radius-lg: 14px;
+    --radius-md: 10px;
+    --radius-sm: 8px;
+}
+
+body {
+    font-family: "HarmonyOS Sans SC", "PingFang SC", "Source Han Sans SC",
+        "Noto Sans CJK SC", "Microsoft YaHei", "Heiti SC", "STHeiti", sans-serif;
+    color: var(--text-color);
+    background:
+        radial-gradient(900px 600px at 5% -10%, #fff4e8 0%, transparent 60%),
+        radial-gradient(900px 600px at 95% -15%, #e8f7f3 0%, transparent 60%),
+        var(--bg);
+}
+
+.navbar.bg-primary {
+    background: linear-gradient(120deg, var(--primary-color), var(--primary-dark)) !important;
+}
+
+.card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    background: var(--surface);
+}
+
+.card-header {
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table-responsive {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.table thead th {
+    background-color: var(--surface-alt);
+    color: var(--text-color);
+}
+
+.table tbody tr:hover {
+    background-color: #f7f2ec;
+}
+
+.progress-container {
+    background: linear-gradient(180deg, #1f1b16 0%, #14110f 100%);
+    border: 1px solid #2c2520;
+    box-shadow: var(--shadow-md);
+    color: #e7e2d9;
+}
+
+.progress-container::before {
+    color: #9dd6cf;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.page-toolbar,
+.table-responsive,
+.progress-container {
+    animation: fadeInUp 0.6s ease both;
+}
+
 /* 通用按钮样式优化 */
 .btn {
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     padding: 6px 12px;
     font-weight: 500;
     font-size: 0.85rem;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
 }
 
 .btn:hover,
@@ -15,48 +101,48 @@
 }
 
 .btn-primary {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
 }
 
 .btn-success {
-    background-color: #198754;
-    border-color: #198754;
+    background-color: var(--success-color);
+    border-color: var(--success-color);
 }
 
 .btn-info {
-    background-color: #0dcaf0;
-    border-color: #0dcaf0;
+    background-color: var(--info-color);
+    border-color: var(--info-color);
     color: #fff;
 }
 
 .btn-outline-primary {
-    color: #0d6efd;
-    border-color: #0d6efd;
+    color: var(--primary-color);
+    border-color: var(--primary-color);
 }
 
 .btn-outline-primary:hover {
-    background-color: #0d6efd;
+    background-color: var(--primary-color);
     color: #fff;
 }
 
 .btn-outline-info {
-    color: #0dcaf0;
-    border-color: #0dcaf0;
+    color: var(--info-color);
+    border-color: var(--info-color);
 }
 
 .btn-outline-info:hover {
-    background-color: #0dcaf0;
+    background-color: var(--info-color);
     color: #fff;
 }
 
 .btn-outline-danger {
-    color: #dc3545;
-    border-color: #dc3545;
+    color: var(--danger-color);
+    border-color: var(--danger-color);
 }
 
 .btn-outline-danger:hover {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
     color: #fff;
 }
 

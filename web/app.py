@@ -4,9 +4,9 @@ import os
 import time
 import logging
 import subprocess
-import json
 import sys
 import re
+import shutil
 from pathlib import Path
 from threading import Thread, Lock
 from queue import Queue
@@ -24,6 +24,7 @@ sys.path.append(str(ROOT_DIR))
 import config
 from src.errors import Codes, format_message
 from src.logging_config import setup_logging
+import storage
 
 # 配置文件存储路径
 UPLOAD_FOLDER = 'data/upload'
@@ -49,6 +50,8 @@ ALLOWED_EXTS = {
     ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg",
     ".txt",
 }
+
+RECORDS_PATH = os.path.join(app.root_path, 'data', 'transcription_records.json')
 
 task_queue = Queue()
 worker_lock = Lock()
@@ -92,6 +95,16 @@ def ensure_unique_path(directory, filename):
     return candidate
 
 
+def load_records():
+    data = storage.load_records(RECORDS_PATH)
+    data, changed = storage.migrate_records(data, os.path.join(app.root_path, UPLOAD_FOLDER),
+                                            os.path.join(app.root_path, OUTPUT_FOLDER), ALLOWED_EXTS)
+    data, sync_changed = storage.sync_with_upload(data, os.path.join(app.root_path, UPLOAD_FOLDER), ALLOWED_EXTS)
+    if changed or sync_changed:
+        storage.save_records(RECORDS_PATH, data)
+    return data
+
+
 def clean_output_line(line):
     if line is None:
         return ""
@@ -120,6 +133,30 @@ def should_skip_output(line):
     return False
 
 
+def normalize_output_filenames(output_dir, stored_name, display_name):
+    if not output_dir or not stored_name or not display_name:
+        return
+    if stored_name == display_name:
+        return
+    stored_base = os.path.splitext(stored_name)[0]
+    display_base = os.path.splitext(display_name)[0]
+    if not os.path.exists(output_dir):
+        return
+    for fname in os.listdir(output_dir):
+        new_name = None
+        if fname.startswith(stored_name):
+            new_name = display_name + fname[len(stored_name):]
+        elif stored_base and fname.startswith(stored_base):
+            new_name = display_base + fname[len(stored_base):]
+        if new_name:
+            old_path = os.path.join(output_dir, fname)
+            new_path = os.path.join(output_dir, new_name)
+            try:
+                os.replace(old_path, new_path)
+            except Exception:
+                pass
+
+
 def task_worker():
     while True:
         filename, steps, model_type, model_size = task_queue.get()
@@ -139,47 +176,27 @@ def enqueue_task(filename, steps, model_type=None, model_size=None):
 
 def get_files_info():
     upload_dir = os.path.join(app.root_path, UPLOAD_FOLDER)
-
-    records = load_transcription_records()
-    file_records = {}
-    for record in records.get('records', []):
-        if not isinstance(record, dict):
-            continue
-        filename = record.get('file_name')
-        if not isinstance(filename, str) or not filename.strip():
-            continue
-        file_records[filename] = record
-
-    # 回填缺失记录（避免老文件不显示）
-    if os.path.exists(upload_dir):
-        for file in os.listdir(upload_dir):
-            if not is_allowed_file(file):
-                continue
-            if file.endswith("_转写.txt"):
-                continue
-            if file not in file_records:
-                update_transcription_record(file, created_time=time.strftime('%Y-%m-%d %H:%M:%S'))
-                file_records[file] = {
-                    'file_name': file,
-                    'transcribed': False,
-                    'last_transcription_time': None,
-                    'created_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-                }
-
+    records = load_records()
+    items = storage.list_records(records, upload_dir, ALLOWED_EXTS)
     files_info = []
-    for file, record in file_records.items():
-        if not isinstance(file, str):
-            continue
-        if not os.path.exists(os.path.join(upload_dir, file)):
-            continue
-        created_time = record.get('created_time') or time.strftime('%Y-%m-%d %H:%M:%S')
+    for item in items:
+        created_time = item.get('created_time') or time.strftime('%Y-%m-%d %H:%M:%S')
+        display_time = item.get('last_summary_time') or item.get('last_fix_time') or item.get('last_time') or '未转写'
+        status = '未转写'
+        if item.get('summarized'):
+            status = '已总结'
+        elif item.get('fixed'):
+            status = '已修补'
+        elif item.get('transcribed'):
+            status = '已转写'
         files_info.append({
-            'name': file,
-            'transcribed': record.get('transcribed', False),
-            'last_time': record.get('last_transcription_time') or '未转写',
+            'id': item.get('id'),
+            'name': item.get('file_name'),
+            'status': status,
+            'transcribed': item.get('transcribed', False),
+            'last_time': display_time,
             'created_time': created_time
         })
-
     files_info.sort(key=lambda x: x['created_time'] or '', reverse=True)
     return files_info
 
@@ -209,10 +226,32 @@ def download_video():
     try:
         filename = download_media(url, upload_dir)
         if filename:
+            safe_name = sanitize_filename(filename)
+            file_id = storage.generate_file_id()
+            stored_name = f"{file_id}__{safe_name}"
+            src_path = os.path.join(upload_dir, filename)
+            dst_path = os.path.join(upload_dir, stored_name)
+            try:
+                if os.path.exists(src_path):
+                    os.replace(src_path, dst_path)
+                else:
+                    stored_name = safe_name
+            except Exception:
+                stored_name = safe_name
             # 记录文件创建时间
-            update_transcription_record(filename, created_time=time.strftime('%Y-%m-%d %H:%M:%S'))
-            socketio.emit('download_progress', {'status': 'success', 'code': Codes.SUCCESS, 'message': f'文件 {filename} 下载成功'})
-            return jsonify({'status': 'success', 'code': Codes.SUCCESS, 'message': f'文件 {filename} 下载成功'})
+            update_transcription_record(
+                filename=safe_name,
+                file_id=file_id,
+                stored_name=stored_name,
+                output_folder=file_id,
+                created_time=time.strftime('%Y-%m-%d %H:%M:%S'),
+                transcribed=False,
+                fixed=False,
+                summarized=False,
+                create_if_missing=True
+            )
+            socketio.emit('download_progress', {'status': 'success', 'code': Codes.SUCCESS, 'message': f'文件 {safe_name} 下载成功'})
+            return jsonify({'status': 'success', 'code': Codes.SUCCESS, 'message': f'文件 {safe_name} 下载成功'})
         else:
             socketio.emit('download_progress', {'status': 'error', 'code': Codes.DOWNLOAD_FAIL, 'message': '下载失败'})
             logger.error(format_message(Codes.DOWNLOAD_FAIL, '下载失败', f'url={url}'))
@@ -252,16 +291,28 @@ def upload_files():
             errors.append({'file': original_name, 'code': Codes.UNSUPPORTED_INPUT, 'message': '不支持的文件类型'})
             continue
 
-        final_name = ensure_unique_path(upload_dir, safe_name)
+        file_id = storage.generate_file_id()
+        stored_name = f"{file_id}__{safe_name}"
+        final_name = ensure_unique_path(upload_dir, stored_name)
         save_path = os.path.join(upload_dir, final_name)
         try:
             f.save(save_path)
-            saved.append(final_name)
-            update_transcription_record(final_name, created_time=time.strftime('%Y-%m-%d %H:%M:%S'))
+            saved.append(safe_name)
+            update_transcription_record(
+                filename=safe_name,
+                file_id=file_id,
+                stored_name=final_name,
+                output_folder=file_id,
+                created_time=time.strftime('%Y-%m-%d %H:%M:%S'),
+                transcribed=False,
+                fixed=False,
+                summarized=False,
+                create_if_missing=True
+            )
             if auto_start:
-                enqueue_task(final_name, steps, model_type, model_size)
-                queued.append(final_name)
-            logger.info(f"上传成功: {final_name}")
+                enqueue_task(file_id, steps, model_type, model_size)
+                queued.append(safe_name)
+            logger.info(f"上传成功: {safe_name}")
         except Exception as e:
             errors.append({'file': original_name, 'code': Codes.UPLOAD_FAIL, 'message': str(e)})
             logger.error(format_message(Codes.UPLOAD_FAIL, '上传失败', f'file={original_name} err={e}'))
@@ -281,30 +332,54 @@ def start_transcribe():
         return jsonify({'status': 'error', 'code': Codes.INVALID_ARGS, 'message': '未提供文件名'})
     if not is_valid_steps(steps):
         return jsonify({'status': 'error', 'code': Codes.INVALID_ARGS, 'message': 'steps 参数不合法'})
-    if not os.path.exists(os.path.join(app.root_path, UPLOAD_FOLDER, filename)):
-        return jsonify({'status': 'error', 'code': Codes.INPUT_NOT_FOUND, 'message': '文件不存在'})
+    # 允许 filename 传入 file_id
+    records = load_records()
+    record = storage.find_record(records, file_id=filename, filename=filename)
+    if record:
+        if record.get('id'):
+            filename = record.get('id')
+        stored_name = (record.get('stored_name') or record.get('file_name'))
+        if not os.path.exists(os.path.join(app.root_path, UPLOAD_FOLDER, stored_name)):
+            return jsonify({'status': 'error', 'code': Codes.INPUT_NOT_FOUND, 'message': '文件不存在'})
+    else:
+        return jsonify({'status': 'error', 'code': Codes.INPUT_NOT_FOUND, 'message': '文件记录不存在，请刷新列表'})
     
     enqueue_task(filename, steps, model_type, model_size)
     return jsonify({'status': 'success', 'code': Codes.SUCCESS, 'message': '已加入任务队列'})
 
 @app.route('/transcribe/<filename>')
 def view_transcription(filename):
+    records = load_records()
+    record = storage.find_record(records, file_id=filename, filename=filename)
+    if record:
+        norm = storage.normalize_record(record, ALLOWED_EXTS)
+        base_name = norm['output_folder']
+        display_name = norm['file_name']
+        stored_name = norm['stored_name']
+    else:
+        base_name = filename
+        display_name = filename
+        stored_name = filename
+
     # 获取输出目录路径
-    base_name = os.path.splitext(filename)[0]
     file_output_dir = os.path.join(app.root_path, OUTPUT_FOLDER, base_name)
     
     # 获取目录下的所有文件
     files = []
     if os.path.exists(file_output_dir):
         files = [{'name': f} for f in os.listdir(file_output_dir)]
-    
+
     # 获取默认显示的文件内容（优先 _转写.md）
-    default_candidates = [
-        f'{os.path.splitext(filename)[0]}_音频_转写.md',
-        f'{os.path.splitext(filename)[0]}_转写.md',
-        f'{os.path.splitext(filename)[0]}_音频_转写.txt',
-        f'{os.path.splitext(filename)[0]}_转写.txt',
-    ]
+    default_candidates = []
+    for prefix in [display_name]:
+        if not prefix:
+            continue
+        default_candidates.extend([
+            f'{prefix}_音频_转写.md',
+            f'{prefix}_转写.md',
+            f'{prefix}_音频_转写.txt',
+            f'{prefix}_转写.txt',
+        ])
     default_file = None
     for candidate in default_candidates:
         if os.path.exists(os.path.join(file_output_dir, candidate)):
@@ -327,17 +402,14 @@ def view_transcription(filename):
     source_file = None
     upload_dir = os.path.join(app.root_path, UPLOAD_FOLDER)
     if os.path.exists(upload_dir):
-        candidates = [
-            f for f in os.listdir(upload_dir)
-            if is_allowed_file(f) and os.path.splitext(f)[0] == base_name
-        ]
-        candidates.sort()
-        if candidates:
-            source_file = candidates[0]
+        if stored_name and os.path.exists(os.path.join(upload_dir, stored_name)):
+            source_file = stored_name
 
     return render_template(
         'detail.html',
-        filename=filename,
+        filename=base_name,
+        folder_name=base_name,
+        display_name=display_name,
         files=files,
         content=content,
         default_file=default_file,
@@ -410,9 +482,21 @@ def save_output_file(folder, filename):
 @app.route('/delete_all_file/<path:filename>', methods=['POST'])
 def delete_all_file(filename):
     import shutil
-    
+
+    records = load_records()
+    record = storage.find_record(records, file_id=filename, filename=filename)
+    if record:
+        norm = storage.normalize_record(record, ALLOWED_EXTS)
+        stored_name = norm['stored_name']
+        output_folder_name = norm['output_folder']
+        display_name = norm['file_name']
+    else:
+        stored_name = filename
+        output_folder_name = storage.compute_base_name(filename, ALLOWED_EXTS)
+        display_name = filename
+
     # 删除源文件
-    source_file = os.path.join(app.root_path, UPLOAD_FOLDER, filename)
+    source_file = os.path.join(app.root_path, UPLOAD_FOLDER, stored_name)
     if os.path.exists(source_file):
         try:
             os.remove(source_file)
@@ -422,7 +506,7 @@ def delete_all_file(filename):
             return jsonify({'status': 'error', 'code': Codes.FILE_IO, 'message': f'删除源文件时出错: {str(e)}'})
     
     # 删除输出文件夹
-    output_folder = os.path.join(app.root_path, OUTPUT_FOLDER, os.path.splitext(filename)[0])
+    output_folder = os.path.join(app.root_path, OUTPUT_FOLDER, output_folder_name)
     if os.path.exists(output_folder):
         try:
             shutil.rmtree(output_folder)
@@ -432,9 +516,12 @@ def delete_all_file(filename):
             return jsonify({'status': 'error', 'code': Codes.FILE_IO, 'message': f'删除输出文件夹时出错: {str(e)}'})
     
     # 删除转写记录
-    records = load_transcription_records()
-    records['records'] = [r for r in records['records'] if r['file_name'] != filename]
-    save_transcription_records(records)
+    records = load_records()
+    records['records'] = [
+        r for r in records.get('records', [])
+        if not (isinstance(r, dict) and (r.get('id') == filename or r.get('file_name') == display_name))
+    ]
+    storage.save_records(RECORDS_PATH, records)
     
     return jsonify({'status': 'success', 'code': Codes.SUCCESS, 'message': '文件删除成功'})
 
@@ -456,57 +543,62 @@ def delete_file_in_output(folder, filename):
     return jsonify({'status': 'error', 'code': Codes.INPUT_NOT_FOUND, 'message': '文件不存在'})
 
 
-def load_transcription_records():
-    records_file = os.path.join(app.root_path, 'data/transcription_records.json')
-    if os.path.exists(records_file):
-        try:
-            with open(records_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if isinstance(data, dict) and isinstance(data.get('records', []), list):
-                    return data
-                logger.warning('转写记录格式异常，将重置记录')
-        except Exception as e:
-            logger.warning(f'读取转写记录失败，将重置记录: {e}')
-    return {"records": []}
-
-def save_transcription_records(records):
-    records_file = os.path.join(app.root_path, 'data/transcription_records.json')
-    os.makedirs(os.path.dirname(records_file), exist_ok=True)
-    with open(records_file, 'w', encoding='utf-8') as f:
-        json.dump(records, f, indent=2, ensure_ascii=False)
-
-def update_transcription_record(filename, transcribed=False, last_time=None, created_time=None):
-    if not isinstance(filename, str) or not filename.strip():
+def update_transcription_record(filename=None, file_id=None, stored_name=None, output_folder=None,
+                                transcribed=None, fixed=None, summarized=None,
+                                last_time=None, last_fix_time=None, last_summary_time=None,
+                                created_time=None, create_if_missing=True):
+    if not file_id and not filename:
         logger.error(format_message(Codes.INVALID_ARGS, '转写记录文件名无效', str(filename)))
         return
-    records = load_transcription_records()
-    
-    # 查找现有记录或创建新记录
-    record = next((r for r in records['records'] if r['file_name'] == filename), None)
-    if record is None:
-        record = {
-            'file_name': filename,
-            'transcribed': False,
-            'last_transcription_time': None,
-            'created_time': created_time or time.strftime('%Y-%m-%d %H:%M:%S')
-        }
-        records['records'].append(record)
-    
-    # 更新记录
-    record['transcribed'] = transcribed
-    record['last_transcription_time'] = last_time
-    
-    save_transcription_records(records)
+    records = load_records()
+    existing = storage.find_record(records, file_id=file_id, filename=filename)
+    if not existing and not create_if_missing:
+        logger.error(format_message(Codes.INPUT_NOT_FOUND, '转写记录不存在', str(filename or file_id)))
+        return
+    storage.upsert_record(
+        records,
+        file_name=filename or stored_name or file_id,
+        file_id=file_id,
+        stored_name=stored_name,
+        output_folder=output_folder,
+        transcribed=transcribed,
+        fixed=fixed,
+        summarized=summarized,
+        last_time=last_time,
+        last_fix_time=last_fix_time,
+        last_summary_time=last_summary_time,
+        created_time=created_time,
+    )
+    storage.save_records(RECORDS_PATH, records)
 
 
-def transcribe_task(filename, steps='12', model_type=None, model_size=None):
-    input_file = os.path.join(app.root_path, UPLOAD_FOLDER, filename)
-    file_output_dir = os.path.join(app.root_path, OUTPUT_FOLDER, os.path.splitext(filename)[0])
+def transcribe_task(file_ref, steps='12', model_type=None, model_size=None):
+    records = load_records()
+    record = storage.find_record(records, file_id=file_ref, filename=file_ref)
+    if record:
+        norm = storage.normalize_record(record, ALLOWED_EXTS)
+        stored_name = norm['stored_name']
+        display_name = norm['file_name']
+        output_folder = norm['output_folder']
+        file_id = norm['id']
+    else:
+        logger.error(format_message(Codes.INPUT_NOT_FOUND, '转写记录不存在', str(file_ref)))
+        socketio.emit('transcribe_progress', {'data': f'转写记录不存在：{file_ref}，请刷新列表'})
+        return
+
+    input_file = os.path.join(app.root_path, UPLOAD_FOLDER, stored_name)
+    file_output_dir = os.path.join(app.root_path, OUTPUT_FOLDER, output_folder)
     os.makedirs(file_output_dir, exist_ok=True)
     
-    update_transcription_record(filename)
-    logger.info(f"开始任务: {filename} steps={steps} model_type={model_type or 'default'} model_size={model_size or 'default'}")
-    socketio.emit('transcribe_progress', {'data': f'开始转写：{filename} (步骤：{steps})'})
+    update_transcription_record(
+        filename=display_name,
+        file_id=file_id,
+        stored_name=stored_name,
+        output_folder=output_folder,
+        create_if_missing=False
+    )
+    logger.info(f"开始任务: {display_name} steps={steps} model_type={model_type or 'default'} model_size={model_size or 'default'}")
+    socketio.emit('transcribe_progress', {'data': f'开始转写：{display_name} (步骤：{steps})'})
     
     python_exec = sys.executable or 'python'
     cmd = [
@@ -568,12 +660,29 @@ def transcribe_task(filename, steps='12', model_type=None, model_size=None):
             
             return_code = process.wait()
         if return_code == 0:
-            update_transcription_record(filename, True, time.strftime('%Y-%m-%d %H:%M:%S'))
-            socketio.emit('transcribe_complete', {'filename': filename})
-            logger.info(f"任务完成: {filename}")
+            normalize_output_filenames(file_output_dir, stored_name, display_name)
+            did_transcribe = '2' in steps
+            did_fix = '3' in steps
+            did_summary = '4' in steps
+            now_ts = time.strftime('%Y-%m-%d %H:%M:%S')
+            update_transcription_record(
+                filename=display_name,
+                file_id=file_id,
+                stored_name=stored_name,
+                output_folder=output_folder,
+                transcribed=True if did_transcribe else None,
+                fixed=True if did_fix else None,
+                summarized=True if did_summary else None,
+                last_time=now_ts if did_transcribe else None,
+                last_fix_time=now_ts if did_fix else None,
+                last_summary_time=now_ts if did_summary else None,
+                create_if_missing=False
+            )
+            socketio.emit('transcribe_complete', {'filename': display_name})
+            logger.info(f"任务完成: {display_name}")
         else:
             socketio.emit('transcribe_progress', {'data': f'转写失败，返回码: {return_code}'})
-            logger.error(format_message(Codes.TASK_FAIL, '转写失败', f'file={filename} code={return_code}'))
+            logger.error(format_message(Codes.TASK_FAIL, '转写失败', f'file={display_name} code={return_code}'))
     except Exception as e:
         socketio.emit('transcribe_progress', {'data': f'转写出错: {str(e)}'})
         logger.error(format_message(Codes.TASK_FAIL, '转写出错', f'file={filename} err={e}'))

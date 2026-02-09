@@ -247,12 +247,11 @@ paraformer 可用 paraformer-zh/paraformer-en/paraformer-zh-streaming 等
                 return
             current_file = data_file
             
-            # 如果步骤2是最后一步，将结果复制到output目录
-            if steps[-1] == 2:
-                output_file = os.path.join(args.output_dir, os.path.basename(current_file))
-                if not copy_file(current_file, output_file):
-                    logger.error(format_message(Codes.FILE_IO, '复制转写结果到output目录失败'))
-                    return
+            # 始终将转写结果复制到output目录，方便Web端预览
+            output_file = os.path.join(args.output_dir, os.path.basename(current_file))
+            if not copy_file(current_file, output_file):
+                logger.error(format_message(Codes.FILE_IO, '复制转写结果到output目录失败'))
+                return
         
         # 步骤3：AI文本修正润色
         if 3 in steps:
