@@ -80,6 +80,14 @@ def is_valid_steps(steps):
     return ordered == sorted(ordered)
 
 
+def parse_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 def is_allowed_file(filename):
     ext = os.path.splitext(filename)[1].lower()
     return ext in ALLOWED_EXTS
@@ -93,6 +101,23 @@ def ensure_unique_path(directory, filename):
         candidate = f"{base}_{counter}{ext}"
         counter += 1
     return candidate
+
+
+def normalize_text_filename(filename):
+    safe_name = sanitize_filename(filename)
+    if not safe_name:
+        return None
+    if not safe_name.lower().endswith('.txt'):
+        safe_name = f'{safe_name}.txt'
+    return safe_name
+
+
+def is_text_file(filename):
+    return bool(filename) and os.path.splitext(filename)[1].lower() == '.txt'
+
+
+def is_valid_text_steps(steps):
+    return steps in {'34', '4'}
 
 
 def load_records():
@@ -155,6 +180,53 @@ def normalize_output_filenames(output_dir, stored_name, display_name):
                 os.replace(old_path, new_path)
             except Exception:
                 pass
+
+
+def save_text_input_record(filename, content, steps='34', auto_start=True, model_type=None, model_size=None):
+    safe_name = normalize_text_filename(filename)
+    if not safe_name:
+        return None, (Codes.INVALID_ARGS, '文件名无效')
+    if content is None or not str(content).strip():
+        return None, (Codes.INVALID_ARGS, '文本内容不能为空')
+    if not is_valid_steps(steps):
+        return None, (Codes.INVALID_ARGS, 'steps 参数不合法')
+    if not is_valid_text_steps(steps):
+        return None, (Codes.INVALID_ARGS, '文本输入仅支持步骤 34 或 4')
+
+    upload_dir = os.path.join(app.root_path, UPLOAD_FOLDER)
+    file_id = storage.generate_file_id()
+    stored_name = ensure_unique_path(upload_dir, f"{file_id}__{safe_name}")
+    save_path = os.path.join(upload_dir, stored_name)
+
+    try:
+        with open(save_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+    except Exception as e:
+        logger.error(format_message(Codes.FILE_IO, '保存文本输入失败', f'file={safe_name} err={e}'))
+        return None, (Codes.FILE_IO, str(e))
+
+    update_transcription_record(
+        filename=safe_name,
+        file_id=file_id,
+        stored_name=stored_name,
+        output_folder=file_id,
+        created_time=time.strftime('%Y-%m-%d %H:%M:%S'),
+        transcribed=False,
+        fixed=False,
+        summarized=False,
+        create_if_missing=True
+    )
+
+    if auto_start:
+        enqueue_task(file_id, steps, model_type, model_size)
+
+    return {
+        'id': file_id,
+        'name': safe_name,
+        'stored_name': stored_name,
+        'queued': auto_start,
+        'steps': steps,
+    }, None
 
 
 def task_worker():
@@ -290,6 +362,9 @@ def upload_files():
         if not is_allowed_file(safe_name):
             errors.append({'file': original_name, 'code': Codes.UNSUPPORTED_INPUT, 'message': '不支持的文件类型'})
             continue
+        if is_text_file(safe_name) and not is_valid_text_steps(steps):
+            errors.append({'file': original_name, 'code': Codes.INVALID_ARGS, 'message': 'txt 文件仅支持步骤 34 或 4'})
+            continue
 
         file_id = storage.generate_file_id()
         stored_name = f"{file_id}__{safe_name}"
@@ -321,6 +396,60 @@ def upload_files():
     code = Codes.SUCCESS if saved else Codes.UPLOAD_FAIL
     return jsonify({'status': status, 'code': code, 'saved': saved, 'queued': queued, 'errors': errors})
 
+
+@app.route('/text_input', methods=['POST'])
+def create_text_input():
+    data = request.get_json(silent=True) or {}
+    filename = data.get('filename')
+    content = data.get('content')
+    steps = data.get('steps', '34')
+    auto_start = parse_bool(data.get('auto_start'), default=True)
+    model_type = (data.get('model_type') or '').strip() or None
+    model_size = (data.get('model_size') or '').strip() or None
+
+    result, error = save_text_input_record(
+        filename=filename,
+        content=content,
+        steps=steps,
+        auto_start=auto_start,
+        model_type=model_type,
+        model_size=model_size,
+    )
+    if error:
+        code, message = error
+        return jsonify({'status': 'error', 'code': code, 'message': message})
+    return jsonify({'status': 'success', 'code': Codes.SUCCESS, 'message': '文本已保存', 'data': result})
+
+
+@app.route('/api/v1/text-inputs', methods=['POST'])
+def api_create_text_input():
+    data = request.get_json(silent=True) or {}
+    filename = data.get('filename')
+    content = data.get('content')
+    steps = data.get('steps', '34')
+    auto_start = parse_bool(data.get('auto_start'), default=True)
+    model_type = (data.get('model_type') or '').strip() or None
+    model_size = (data.get('model_size') or '').strip() or None
+
+    result, error = save_text_input_record(
+        filename=filename,
+        content=content,
+        steps=steps,
+        auto_start=auto_start,
+        model_type=model_type,
+        model_size=model_size,
+    )
+    if error:
+        code, message = error
+        status_code = 400 if code == Codes.INVALID_ARGS else 500
+        return jsonify({'status': 'error', 'code': code, 'message': message}), status_code
+    return jsonify({
+        'status': 'success',
+        'code': Codes.SUCCESS,
+        'message': '文本已保存',
+        'data': result,
+    })
+
 @app.route('/transcribe', methods=['POST'])
 def start_transcribe():
     filename = request.form.get('filename')
@@ -338,9 +467,12 @@ def start_transcribe():
     if record:
         if record.get('id'):
             filename = record.get('id')
-        stored_name = (record.get('stored_name') or record.get('file_name'))
+        display_name = record.get('file_name')
+        stored_name = (record.get('stored_name') or display_name)
         if not os.path.exists(os.path.join(app.root_path, UPLOAD_FOLDER, stored_name)):
             return jsonify({'status': 'error', 'code': Codes.INPUT_NOT_FOUND, 'message': '文件不存在'})
+        if is_text_file(display_name) and not is_valid_text_steps(steps):
+            return jsonify({'status': 'error', 'code': Codes.INVALID_ARGS, 'message': 'txt 文件仅支持步骤 34 或 4'})
     else:
         return jsonify({'status': 'error', 'code': Codes.INPUT_NOT_FOUND, 'message': '文件记录不存在，请刷新列表'})
     

@@ -394,6 +394,11 @@
                                 <select class="form-select" id="transcribeModelSize"></select>
                                 <input class="form-control mt-2 d-none" id="transcribeModelSizeCustom" placeholder="输入自定义模型名（如：paraformer-zh 或 whisper 自定义版本）">
                             </div>
+                            <div class="col-md-12 col-lg-3">
+                                <button type="button" class="btn btn-secondary w-100" onclick="refreshStatus()">
+                                    <i class="bi bi-arrow-clockwise"></i> 刷新
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -405,14 +410,14 @@
                             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#promptModal">
                                 <i class="bi bi-file-earmark-text"></i> Prompt管理
                             </button>
+                            <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#textInputModal">
+                                <i class="bi bi-pencil-square"></i> 输入文本
+                            </button>
                             <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#uploadModal">
                                 <i class="bi bi-upload"></i> 上传本地文件
                             </button>
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#downloadModal">
                                 <i class="bi bi-cloud-download"></i> 下载音视频
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="refreshStatus()">
-                                <i class="bi bi-arrow-clockwise"></i> 刷新
                             </button>
                         </div>
                     </div>
@@ -450,6 +455,49 @@
             </div>
         </div>
 
+        <!-- 直接输入文本模态框 -->
+        <div class="modal fade" id="textInputModal" tabindex="-1" aria-labelledby="textInputModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title" id="textInputModalLabel">直接输入文本</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <form id="textInputForm">
+                            <div class="mb-3">
+                                <label for="textInputFilename" class="form-label fw-bold">文件名</label>
+                                <input type="text" class="form-control" id="textInputFilename" placeholder="例如：会议纪要.txt" required>
+                                <div class="form-text">可不写 `.txt` 后缀，系统会自动补上。</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="textInputContent" class="form-label fw-bold">文本内容</label>
+                                <textarea class="form-control" id="textInputContent" rows="12" placeholder="直接粘贴或输入文本内容" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="textInputSteps" class="form-label fw-bold">任务步骤</label>
+                                <select class="form-select" id="textInputSteps">
+                                    <option value="34">仅AI处理（34，推荐）</option>
+                                    <option value="4">仅总结（4）</option>
+                                </select>
+                                <div class="form-text">输入文本只支持 `34` 或 `4` 流程。</div>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="textInputAutoStart" checked>
+                                <label class="form-check-label" for="textInputAutoStart">保存后自动建立任务</label>
+                            </div>
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-info text-white">
+                                    <i class="bi bi-save me-2"></i>保存文本
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 本地上传模态框 -->
         <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">
@@ -473,7 +521,9 @@
                                     <option value="123">转后修补（123）</option>
                                     <option value="1234">转补总结（1234）</option>
                                     <option value="34">仅AI处理（34，需要txt输入）</option>
+                                    <option value="4">仅总结（4，需要txt输入）</option>
                                 </select>
+                                <div class="form-text">如果上传的是 txt，只支持 `34` 或 `4`。</div>
                             </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="uploadAutoStart" checked>
@@ -784,6 +834,11 @@
             const steps = document.getElementById('uploadSteps').value;
             const autoStart = document.getElementById('uploadAutoStart').checked;
             const modelConfig = getSelectedModelConfig();
+            const hasTxt = Array.from(files).some(file => file.name.toLowerCase().endsWith('.txt'));
+            if (hasTxt && !['34', '4'].includes(steps)) {
+                alert('上传 txt 文件时，仅支持步骤 34 或 4');
+                return;
+            }
 
             const formData = new FormData();
             for (const file of files) {
@@ -817,6 +872,59 @@
                 }
             });
             document.querySelector('#uploadModal .btn-close').click();
+        };
+
+        document.getElementById('textInputForm').onsubmit = function(e) {
+            e.preventDefault();
+            const filename = document.getElementById('textInputFilename').value.trim();
+            const content = document.getElementById('textInputContent').value;
+            const steps = document.getElementById('textInputSteps').value;
+            const autoStart = document.getElementById('textInputAutoStart').checked;
+            const modelConfig = getSelectedModelConfig();
+
+            if (!filename) {
+                alert('请输入文件名');
+                return;
+            }
+            if (!content.trim()) {
+                alert('请输入文本内容');
+                return;
+            }
+
+            progressDiv.innerHTML = '开始保存文本输入：' + filename + '<br>';
+            fetch('/text_input', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    filename: filename,
+                    content: content,
+                    steps: steps,
+                    auto_start: autoStart,
+                    model_type: modelConfig.type,
+                    model_size: modelConfig.size
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    progressDiv.innerHTML += '文本保存成功：' + (data.data?.name || filename) + '<br>';
+                    if (data.data?.queued) {
+                        progressDiv.innerHTML += '已加入任务队列：' + (data.data?.name || filename) + '<br>';
+                    }
+                    document.getElementById('textInputForm').reset();
+                    document.getElementById('textInputAutoStart').checked = true;
+                    document.getElementById('textInputSteps').value = '34';
+                    setTimeout(() => updateFileList(), 1000);
+                } else {
+                    progressDiv.innerHTML += '错误：' + data.message + '<br>';
+                }
+            })
+            .catch(() => {
+                progressDiv.innerHTML += '错误：文本保存请求失败<br>';
+            });
+            document.querySelector('#textInputModal .btn-close').click();
         };
 
 
